@@ -1,0 +1,46 @@
+.timer-container {
+    min-width: 280px;
+    height: 3em;
+    position: relative;
+    border-radius: 5px;
+}
+
+.username, .timer {
+    position: absolute;
+    bottom: 0;
+    border-radius: 20px;
+    & > p {
+        margin: 1px 0;
+        padding: 5px 15px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        overflow: hidden;
+        transition: text-align .4s ease;
+    }
+    transition: transform 0.4s ease;
+}
+
+.username {
+    width: 280px;
+    color: white;
+    background-color: rgb(145, 134, 134);
+}
+
+.timer {
+    width: 70px;
+    right: 0;
+    background-color: rgb(104, 156, 104);
+    text-align: center;
+    box-shadow: 0px 2px 6px 2px black;
+}
+
+.username.invert {
+    & > p {
+        text-align: right;
+    }
+}
+
+.timer.invert {
+    transform: translateX(-210px);
+}
+

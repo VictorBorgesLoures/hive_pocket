@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg 
+  xmlns="http://www.w3.org/2000/svg" 
+  width="100"
+  height="100"
+  viewBox="0 0 100 100"
+>
+  <path
+    style="fill:#4d4d4d"
+    d="M50 20 C45 25, 40 35, 45 45 C50 50, 55 45, 55 35 C55 30, 52 25, 50 20 Z M50 45 L50 75 M45 60 L55 60"
+  />
+</svg> 

@@ -1,0 +1,5 @@
+.board-content {
+    background-image: url("../../assets/board-wood.webp");
+    background-size: cover;
+    min-height: 100vh;
+}
