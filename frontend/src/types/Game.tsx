@@ -367,7 +367,8 @@ export class GamePiece {
           }
           if(!board.pieces.has(hashPosToKey(d))) {
             if(!board.getNeighbors(d)?.some(n => n.ownerId !== this.ownerId))
-              possibleMoves.push(d);
+              if(!possibleMoves.find(pm => pm.q === d.q && pm.r === d.r))
+                possibleMoves.push(d);
           }
         })
       })
@@ -389,7 +390,7 @@ export class GamePiece {
 
     Array.from(possiblePositions.values()).some(dir => {
       const valid = this.validMovement(board, this, dir)
-      if(valid) 
+      if(valid && !possibleMoves.find(pm => pm.q === dir.q && pm.r === dir.r)) 
         possibleMoves.push(dir);
     })
     this.possibleMoves = possibleMoves;

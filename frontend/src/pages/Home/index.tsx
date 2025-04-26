@@ -20,6 +20,7 @@ import AboutPage from '@src/components/About';
 
 const loginSchema = z.object({
   username: z.string().min(1, "Username is required"),
+  username_p2: z.string().min(1, "Username is required"),
   mode: z.nativeEnum(GAME_MODE).default(GAME_MODE.LOCAL),
   difficulty: z.nativeEnum(GAME_DIFFICULTY).default(GAME_DIFFICULTY.EASY),
   timer: z.nativeEnum(GAME_TIMER).default(GAME_TIMER.BULLET),
@@ -47,7 +48,7 @@ export default function HomePage() {
       name: getValues('username')
     })
     const enemy = new User({
-      name: "enemy"
+      name: getValues('mode') === GAME_MODE.LOCAL ? getValues('username_p2') : "Enemy"
     })
     setUser(user)
     const timer = getValues('timer') as GAME_TIMER;
@@ -79,7 +80,7 @@ export default function HomePage() {
       <form className='col-lg-5 col-sm-12 d-inline-grid' onSubmit={
         handleSubmit(handleLogin)}>
         <div className="mb-3" >
-          <label className="form-label">Username</label >
+          <label className="form-label">Username</label>
           <input type="text" className={errors.username ? 'form-control invalid' : 'form-control'}
             placeholder="Enter username"
             {...register('username')}
@@ -88,6 +89,20 @@ export default function HomePage() {
             {errors.username && errors.username.message}
           </div>
         </div>
+        {
+            mode === GAME_MODE.LOCAL && (
+              <div className="mb-3" >
+                <label className="form-label">Username (Player 2)</label>
+                <input type="text" className={errors.username_p2 ? 'form-control invalid' : 'form-control'}
+                  placeholder="Enter username"
+                  {...register('username_p2')}
+                />
+                <div className={errors.username_p2 ? 'invalid-feedback d-block' : 'invalid-feedback'}>
+                  {errors.username_p2 && errors.username_p2.message}
+                </div>
+              </div>
+            )
+          }
         <div className="mb-3">
           <label>Game mode:</label >
           <select className='form-control' disabled {...register('mode', {
