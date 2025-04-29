@@ -973,7 +973,10 @@ export class Board {
 
   brokeBoard(piece: GamePiece): boolean {
     this.pieces.delete(GamePiece.hashPosToKey(piece.pos));
-    const pieces = Array.from(this.pieces.entries()).filter(([key, p]) => p.state === PIECE_STATE.BOARD);
+    const pieces = Array.from(this.pieces.entries()).filter(([_key, p]) => 
+      p.state === PIECE_STATE.BOARD
+      && !this.pieces.has(GamePiece.hashPosToKey({...p.pos, z: p.pos.z+1}))
+  );
     const piecesFound = [...pieces.map(p => p[1].pos)];
     if(piecesFound.length === 0) return false;
     const freq = new Map();
@@ -1163,9 +1166,9 @@ export class Board {
         }
       }else if(
         neighbors 
-        && neighbors.length > 0 // Tem vizinhos
         && !neighbors.some(p => p?.state === PIECE_STATE.BOARD && p?.ownerId !== this.currentPlayer) // Não tem peças adversárias
         && neighbors.some(p => p?.ownerId === this.currentPlayer && p?.state === PIECE_STATE.BOARD) // Tem peças do player  
+        && !this.pieces.has(GamePiece.hashPosToKey(to)) // Local vazio
       ) {
         // Se já tiver feito 3 movimentos, é obrigatório inserir a rainha
         if(
@@ -1179,42 +1182,16 @@ export class Board {
           toast.error("You must insert the Queen!");
           GamePiece.dragBack(piece, coordPos.x, coordPos.y);
           return piece;
-        }
-
-        if(this.pieces.has(GamePiece.hashPosToKey(to)) && piece.type === GAME_PIECE_TYPE.BEETLE) {
-          if(this.brokeBoard(piece)) {
-            GamePiece.dragBack(piece, coordPos.x, coordPos.y);
-            toast.error("The Hive has been broken!");
-            return piece;
-          }
-          this.pieces.delete(GamePiece.hashPosToKey(piece.pos));
-          piece.state = PIECE_STATE.BOARD;
-          piece.pos = to;
-          piece.pos.z = 2;
-          //VALID MOVE
-          this.pieces.set(GamePiece.hashPosToKey(piece.pos), piece);
-          this.changePlayer();
-          return piece;
-        } else if(!this.pieces.has(GamePiece.hashPosToKey(to))) {
-          const neighbors = this.getNeighbors(to);
-          if(neighbors && neighbors.length > 0 ) {
-            if(neighbors.some(p => p?.ownerId === this.currentPlayer && p.id !== piece.id)) {
-              if(this.brokeBoard(piece)) {
-                GamePiece.dragBack(piece, coordPos.x, coordPos.y);
-                toast.error("The hive has been broken!");
-                return piece;
-              }
-              this.pieces.delete(GamePiece.hashPosToKey(piece.pos));
-              piece.state = PIECE_STATE.BOARD;
-              piece.pos = to;
-              piece.draggable.offSet = {x: 0, y: 0};
-              //VALID MOVE
-              this.pieces.set(GamePiece.hashPosToKey(piece.pos), piece);
-              this.changePlayer();
-              return piece;
-            }
-          }
-        }
+        }       
+        this.pieces.delete(GamePiece.hashPosToKey(piece.pos));
+        piece.state = PIECE_STATE.BOARD;
+        piece.pos = to;
+        piece.draggable.offSet = {x: 0, y: 0};
+        //VALID MOVE
+        this.pieces.set(GamePiece.hashPosToKey(piece.pos), piece);
+        this.changePlayer();
+        return piece;     
+        
       }
     }
     toast.error("Can't move the piece!");
@@ -1279,7 +1256,7 @@ export class Board {
     const qtdQueenBlocked: GamePiece[] = queens.filter(p => {
       const neighbors = this.getNeighbors(p.pos)
       return neighbors
-        && neighbors.filter(n => n.pos.z === 1).length >= 6
+        && neighbors.length >= 6
     })
     if( qtdQueenBlocked.length == 1) {
       this.state = GAME_STATE.FINISHED;
@@ -1630,12 +1607,16 @@ export class Board {
     z=1;
     let neighbors: GamePiece[] = [];
     hexDirections.forEach(dir => {
-      [4,3,2,1,0].forEach(plusZ => {
-        const neighborKey = GamePiece.hashPosToKey({q: q + dir.q, r: r + dir.r, z: z+plusZ });
-        const n = this.pieces.get(neighborKey);
+      const pos = {q: q + dir.q, r: r + dir.r, z: 1 };
+      while(this.pieces.has(GamePiece.hashPosToKey(pos))) {
+        pos.z++;
+      }
+      if(pos.z > 1) {
+        pos.z--;
+        const n = this.pieces.get(GamePiece.hashPosToKey(pos));
         if(n)
           neighbors.push(n);
-      })
+      }
     })
     return neighbors;
   }
