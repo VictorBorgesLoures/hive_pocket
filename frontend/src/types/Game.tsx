@@ -32,6 +32,8 @@ export interface GamePieceConstructor {
 }
 
 const ValidAntMove = (board: Board, currentPiece: GamePiece, to: HexDirection): boolean => {
+  if(board.pieces.has(hashPosToKey(to)))
+    return false;
   const moveAnt = (board: Board, currentPos: HexDirection, finalPos: HexDirection, alreadyVisited: HexDirection[]): boolean[] => {
     if(alreadyVisited.some(pos => pos.q == currentPos.q && pos.r == currentPos.r && pos.z == currentPos.z)) {
       return [false];
@@ -102,7 +104,9 @@ const ValidBeetleMove = (board: Board, currentPiece: GamePiece, to: HexDirection
 }
 
 const ValidGrasshopperMove = (board: Board, currentPiece: GamePiece, to: HexDirection): boolean => {
-  return Object.entries(hexDirectionsCardinal).some(([key, dir]) => {
+  if(board.pieces.has(hashPosToKey(to)))
+    return false;
+  return Object.entries(hexDirectionsCardinal).some(([_key, dir]) => {
     const nextPos = {q: currentPiece.pos.q + dir.q, r: currentPiece.pos.r + dir.r, z: 1};
     if(nextPos.q == to.q && nextPos.r == to.r) {
       // Se mover apenas uma vez e chegar no destino é pq não pulou por cima de nenhuma peça
@@ -121,6 +125,8 @@ const ValidGrasshopperMove = (board: Board, currentPiece: GamePiece, to: HexDire
 }
 
 const ValidQueenMove = (board: Board, currentPiece: GamePiece, to: HexDirection): boolean => {
+  if(board.pieces.has(hashPosToKey(to)))
+    return false;
   return hexDirections.some(dir => {
     const nextPos = {q: currentPiece.pos.q + dir.q, r: currentPiece.pos.r + dir.r, z: 1};
     if(to.q == nextPos.q && to.r == nextPos.r && to.z == nextPos.z) { // Se a posição de destino é a posição de destino
@@ -136,6 +142,8 @@ const ValidQueenMove = (board: Board, currentPiece: GamePiece, to: HexDirection)
 }
 
 const ValidSpiderMove = (board: Board, currentPiece: GamePiece, to: HexDirection): boolean => {
+  if(board.pieces.has(hashPosToKey(to)))
+    return false;
   const moveSpider = (board: Board, currentPos: HexDirection, finalPos: HexDirection, alreadyVisited: HexDirection[], currentMoves: number): boolean[] => {
     if(currentMoves > 3) {
       return [false];
