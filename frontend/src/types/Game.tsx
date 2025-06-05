@@ -538,7 +538,7 @@ export const gameTimerStats: Record<GAME_TIMER, GAME_TIMER_STATS> = {
   bullet: {
     timer: 60*2,
     title: "Bullet",
-    pretify: "3 minutes"
+    pretify: "2 minutes"
   },
   speed: {
     timer: 60*5,
@@ -1122,7 +1122,6 @@ export class Board {
       }
       if(
         (!this.pieces.has(hashPosToKey(to)) || piece.type === GAME_PIECE_TYPE.BEETLE) // Não tem peça no destino ou é um besouro
-        && this.getNeighbors(to)?.some(p => p?.state === PIECE_STATE.BOARD && p?.id != piece.id) // Tem vizinhos no destino
         && !this.pieces.has(GamePiece.hashPosToKey({...piece.pos, z: piece.pos.z + 1})) // Não tem peça na posição acima de onde a peça está
         && piece.validMovement(this, piece, to) // Movimento válido da peça
       ) {
@@ -1489,7 +1488,6 @@ export class Board {
     this.pieces.forEach(p => {
       if(p.draggable.isDragging) {
         p.getPossibleMoves(this).forEach(pos => {
-          console.log(pos);
           const {x,y} = this.cubeToPixel(pos, PIECE_STATE.BOARD);
           this.drawHexHover(x, y, "rgba(99, 215, 107, 0.76)");
         })
