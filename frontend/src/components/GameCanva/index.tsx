@@ -39,25 +39,50 @@ export default function Canva({ board }: CanvaProps) {
   useEffect(() => {
     if(!canvaRef.current) return;
     const canva = document.getElementById('canva');
-    canva?.addEventListener("mousedown", (e) => {
+    const mouseDown = (e: any) => {
+      if(!canva) return;
       const rect = canva.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
       boardRef.current.canvaClick(x, y);
-    });
-    canva?.addEventListener("mouseup", (e) => {
+    }
+    canva?.addEventListener("mousedown", mouseDown);
+
+    const mouseUp = (e: any) => { 
+      if(!canva) return;
       const rect = canva.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
       boardRef.current.canvaDrop(x, y);
-    });
-
-    canva?.addEventListener("mousemove", e => {
+    }
+    canva?.addEventListener("mouseup", mouseUp);
+    
+    const mouseMove = (e: any) => {
+      if(!canva) return;
       const rect = canva.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
       boardRef.current.canvaMove(x, y);
-    });
+    }
+    canva?.addEventListener("mousemove", mouseMove);
+
+    const ctrlZ = (e: any) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "z") {
+        e.preventDefault(); // se quiser impedir o comportamento padrão
+        if(boardRef.current) {
+          boardRef.current.backState();
+        }
+      }
+    }
+    window.addEventListener("keydown", ctrlZ)
+    return () => {
+      if(canva) {
+        canva.removeEventListener("mousedown", mouseDown);
+        canva.removeEventListener("mouseup", mouseUp);
+        canva.removeEventListener("mousemove", mouseMove);
+        window.removeEventListener("keydown", ctrlZ)
+      }
+    }
   }, [canvaRef.current]);
 
   useEffect(() => {

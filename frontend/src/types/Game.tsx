@@ -283,6 +283,14 @@ export const enum PIECE_STATE {
   PLAYER = "player",
 }
 
+interface GamePieceMinified {
+  id: string;
+  ownerId: string;
+  pos: HexDirection;
+  type: GAME_PIECE_TYPE;
+  state: PIECE_STATE;
+}
+
 export class GamePiece {
   public id: string;
   public ownerId: string;
@@ -353,7 +361,32 @@ export class GamePiece {
   getPossibleMoves(board: Board): HexDirection[] {
     if(this.possibleMoves) return this.possibleMoves;
 
-    if(this.state === PIECE_STATE.BOARD && board.brokeBoard(this)) {
+    if(board.getPlayer(board.currentPlayer).firstMove) {
+      if(board.p1.id === board.currentPlayer) {
+        if(board.p2.firstMove) {
+          return [{q: 0, r: 0, z:1}];
+        } else {
+          return hexDirections;
+        }
+      } else {
+        if(board.p1.firstMove) {
+          return [{q: 0, r: 0, z:1}];
+        } else {
+          return hexDirections;
+        }
+      }
+    }
+    
+    if(
+      this.state === PIECE_STATE.BOARD 
+      && (
+        board.brokeBoard(this)
+        || Object.values(Object.fromEntries(board.pieces)).some(p => 
+          p.ownerId===board.currentPlayer 
+          && p.type === GAME_PIECE_TYPE.QUEEN 
+          && p.state === PIECE_STATE.PLAYER)
+      )
+    ) {
       this.possibleMoves = [];
       return this.possibleMoves;
     }
@@ -398,8 +431,12 @@ export class GamePiece {
 
     Array.from(possiblePositions.values()).some(dir => {
       const valid = this.validMovement(board, this, dir)
-      if(valid && !possibleMoves.find(pm => pm.q === dir.q && pm.r === dir.r)) 
+      if(valid && !possibleMoves.find(pm => pm.q === dir.q && pm.r === dir.r)) {
+        if(this.type === GAME_PIECE_TYPE.BEETLE) {
+          while(board.pieces.has(hashPosToKey(dir))) dir.z++;
+        }
         possibleMoves.push(dir);
+      }
     })
     this.possibleMoves = possibleMoves;
     return this.possibleMoves;
@@ -561,6 +598,19 @@ export type GameHookState = {
 
 export type GameHook = (args: GameHookState) => void;
 
+type GameTree = {
+  value: string //GameState map id
+  player: string
+  active: boolean
+  children?: GameTree[]
+  p1: {
+    firstMove: boolean
+  }
+  p2: {
+    firstMove: boolean
+  }
+}
+
 export class Board {
   public id: string;
   public p1: GamePlayer;
@@ -586,13 +636,16 @@ export class Board {
     y: 0,
   };
 
+  public gameStates: Map<string, GamePieceMinified[]> = new Map();
+  public gameTree: GameTree | undefined;
+
   static pieceImages: Record<GAME_PIECE_TYPE, HTMLImageElement | null> = {
     ant: null,
     beetle: null,
     grasshopper: null,
     queen: null,
     spider: null
-  };
+  };  
 
   static async preloadImages() {
     await Promise.all(
@@ -679,6 +732,220 @@ export class Board {
         });
     }
     this.render = this.render.bind(this);
+  }
+
+  private genAllPossiblesStates(): GameTree[] {
+    let newChildren: GameTree[] = [];
+    let clonePieces = new Map(this.pieces);
+    this.pieces.forEach(piece => {
+      if(piece.ownerId === this.currentPlayer) {
+        const possibleMoves = piece.getPossibleMoves(this);
+        if(possibleMoves.length) {
+          clonePieces.delete(hashPosToKey(piece.pos));
+          let clonedPiece = new GamePiece(piece);
+          possibleMoves.forEach(pm => {
+            clonedPiece.pos = pm;
+            clonedPiece.state = PIECE_STATE.BOARD;
+            clonePieces.set(hashPosToKey(pm), clonedPiece);
+            const id = this.insertGameState(this.genGameState(clonePieces));
+            newChildren.push({
+              value: id, 
+              active: false, player: 
+              this.currentPlayer == this.p1.id ? this.p2.id : this.p1.id, 
+              p1: {firstMove: this.p1.firstMove}, 
+              p2: {firstMove: this.p2.firstMove}
+            });
+            clonePieces.delete(hashPosToKey(pm));
+          })
+          clonePieces.set(hashPosToKey(piece.pos), piece);
+        }
+      }
+    })
+    const mapped = new Map(newChildren.map(p => [p.value, p]));
+    return Array.from(mapped.values());
+  }
+
+  private saveGameState() {
+    // Pego o último estado salvo na árvore,
+    const lastTree = this.getLastTree();
+    if(!lastTree) {
+      // Não há nenhuma árvore criada, criar nó inicial!
+      const id = this.insertGameState(this.genGameState());
+      // Gerar todos os filhos e inserir na last tree;
+      const children = this.genAllPossiblesStates();
+      this.gameTree = {
+        value: id, 
+        active: true, children, 
+        player: this.currentPlayer, 
+        p1: {firstMove: this.p1.firstMove}, 
+        p2: {firstMove: this.p2.firstMove}
+      };
+    } else {
+      //Já está inserido na last tree
+      const id = this.insertGameState(this.genGameState());
+      //Pego o id do estado (algum children já possui esse ID no value)
+      lastTree.children?.forEach(c => {
+        if(c.value == id) {
+          c.children = this.genAllPossiblesStates();
+          c.active = true;
+          c.p1.firstMove = this.p1.firstMove;
+          c.p2.firstMove = this.p2.firstMove;
+          return;
+        }
+      })
+      if(lastTree.children && lastTree.children.length === 0) {
+        //Player don't have any possible move
+        let copy: GameTree = {
+          ...lastTree
+        };
+        copy.player = this.currentPlayer;
+        copy.children = this.genAllPossiblesStates();
+        lastTree.children.push(copy);
+      }
+    }
+    this.pieces.forEach(p => {
+      p.possibleMoves = null;
+    })
+    console.dir(this.gameTree, {
+      depth: null
+    })
+  }
+
+  private insertGameState(newState: GamePieceMinified[]): string {
+    let id = v1();
+    const generetedId = id;
+    this.gameStates.forEach((value: GamePieceMinified[], key: string) => {
+      if(this.isEqualState(newState, value)) {
+        id = key;
+        return;
+      }
+    })
+    if(id === generetedId) {
+      this.gameStates.set(generetedId, newState);
+    }
+    return id;
+  }
+
+  private getLastTree(): GameTree | undefined {
+    if(!this.gameTree) {
+      return undefined;
+    } else {
+      let currentGame = this.gameTree;
+      let found = true;
+      while(currentGame.children && found) {
+        found = false;
+        currentGame.children.forEach(c => {
+          if(c.active) {
+            currentGame = c;
+            found = true;
+            return;
+          }
+        })
+      }
+      return currentGame;
+    }
+  }
+
+  private genGameState(pieces?: Map<string, GamePiece>): GamePieceMinified[] {
+    return Object.values(Object.fromEntries(pieces ? pieces : this.pieces)).map((p: GamePiece) => {
+      const gamePiece: GamePieceMinified = {
+        id: p.id,
+        ownerId: p.ownerId,
+        pos: p.pos,
+        type: p.type,
+        state: p.state
+      }
+      return gamePiece;
+    })
+  }
+
+  private isEqualState(state: GamePieceMinified[], otherState: GamePieceMinified[]): boolean {
+    return state.every(piece => {
+      return otherState.some(otherPiece => {
+        return (
+          piece.id === otherPiece.id
+          && this.isEqualPosition(piece.pos, otherPiece.pos)
+          && piece.state === otherPiece.state
+        )
+      })
+    })
+  }
+
+  private isEqualPosition(pos: HexDirection, otherPos: HexDirection): boolean {
+    return pos.q === otherPos.q
+      && pos.r === otherPos.r
+      && pos.z === otherPos.z
+  }
+
+  backState() {
+    const loadedPieces = this.loadLastState()
+    if(loadedPieces) {
+      let lastTree = this.getLastTree();
+      if(lastTree) lastTree.active = false;
+      if(this.gameTree && !this.gameTree.active) this.gameTree.active = true;
+      this.currentPlayer = loadedPieces.player;
+      this.p1.firstMove = loadedPieces.p1.firstMove;
+      if(this.p1.moveCount) this.p1.moveCount--;
+      this.p2.firstMove = loadedPieces.p2.firstMove;
+      if(this.p2.moveCount) this.p2.moveCount--;
+      this.pieces = loadedPieces.pieces;
+      let possibleMoves = this.genAllPossiblesStates();
+      if(possibleMoves.length === 0) {
+        this.backState();
+      }
+      this.updateHooks();
+    } else {
+      toast.warning("Can't return more state, alreay at the begning");
+    }
+    console.dir(this.gameTree, {
+      depth: null
+    })
+    this.updateHooks();
+  }
+
+  private gameTreeToPieces(gameTree: GameTree): Map<string, GamePiece> {
+    const map = new Map<string, GamePiece>();
+    const pieces = this.gameStates.get(gameTree.value);
+    if(pieces) {
+      pieces.forEach(p => {
+        map.set(hashPosToKey(p.pos), new GamePiece(p));
+      })
+    }
+
+    return map;
+  }
+
+  private loadLastState(): GameTree & {pieces: Map<string, GamePiece>} | undefined {
+    if(this.gameTree) {
+      let current = this.gameTree;
+      let prev: GameTree | undefined = undefined;
+      let found = true;
+      while(current.children && found) {
+        found = false;
+        current.children.forEach(c => {
+          if(c.active) {
+            found = true;
+            prev = current;
+            current = c;
+            return;
+          }
+        })
+      }
+      if(prev !== undefined) {
+          const pieces = this.gameTreeToPieces(prev);
+        return {
+          ...(prev as GameTree),
+          pieces,
+        };
+      } else {
+        const pieces = this.gameTreeToPieces(current);
+        return {
+          ...current,
+          pieces
+        };
+      }
+    }
+    return undefined;
   }
 
   addTimerRef(timerRef: React.MutableRefObject<ReturnType<typeof setTimeout> | null>  ) {
@@ -923,6 +1190,8 @@ export class Board {
     this.currentPlayer = this.p1.id;
     this.p1.firstMove = true;
     this.p2.firstMove = true;
+
+    this.saveGameState();
   }
 
   start() {
@@ -1158,7 +1427,7 @@ export class Board {
           this.getPlayer(this.currentPlayer).firstMove = false;
           this.pieces.delete(GamePiece.hashPosToKey(piece.pos));
           piece.state = PIECE_STATE.BOARD;
-          piece.pos = {q:-1, r:2, z:1};
+          piece.pos = {q:0, r:0, z:1};
           this.pieces.set(GamePiece.hashPosToKey(piece.pos), piece);
           this.changePlayer();
           return piece;
@@ -1304,9 +1573,11 @@ export class Board {
         this.state = GAME_STATE.FINISHED;
       } else if(!this.getPlayer(this.currentPlayer).canMove) {
         toast.info(`The player ${this.getPlayer(this.currentPlayer).username} lost his turn, doesn't have valid move!`);
+        this.saveGameState(); // must save state, player lost the move
         this.changePlayer();
       }
-    }    
+    }
+    this.saveGameState();
     this.updateHooks();
   }
 

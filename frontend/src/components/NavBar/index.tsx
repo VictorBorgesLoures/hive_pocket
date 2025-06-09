@@ -23,7 +23,6 @@ export default () => {
   }, [board])
 
   useEffect(() => {
-    console.log(username);
     setInvert(prev => !prev);
   }, [username])
 
