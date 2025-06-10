@@ -878,6 +878,10 @@ export class Board {
   }
 
   backState() {
+    if(this.state !== GAME_STATE.PLAYING) {
+      toast.info("To crtl+z you must be playing a match!");
+      return;
+    }
     const loadedPieces = this.loadLastState()
     if(loadedPieces) {
       let lastTree = this.getLastTree();
@@ -1190,7 +1194,8 @@ export class Board {
     this.currentPlayer = this.p1.id;
     this.p1.firstMove = true;
     this.p2.firstMove = true;
-
+    this.gameStates = new Map();
+    this.gameTree = undefined;
     this.saveGameState();
   }
 
@@ -1216,6 +1221,10 @@ export class Board {
   restart() {
     this.p1.time = gameTimerStats[this.timerConfig].timer;
     this.p2.time = gameTimerStats[this.timerConfig].timer;
+    this.offSet = {
+      x: 0,
+      y: 0
+    }
     this.start();
     this.updateHooks();
   }
@@ -1879,9 +1888,8 @@ export class Board {
     }
   }
 
-  getNeighbors({q, r, z}: HexDirection) {
+  getNeighbors({q, r}: HexDirection) {
     if(!this.currentCanva) return;
-    z=1;
     let neighbors: GamePiece[] = [];
     hexDirections.forEach(dir => {
       const pos = {q: q + dir.q, r: r + dir.r, z: 1 };

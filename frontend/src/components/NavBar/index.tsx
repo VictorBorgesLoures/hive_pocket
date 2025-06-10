@@ -33,28 +33,28 @@ export default () => {
         {
           board
           && gameState === GAME_STATE.WAITING
-          && <button type="button" className="btn btn-primary" onClick={e => (board.start())}>
+          && <button type="button" className="btn btn-primary" onClick={() => (board.start())}>
             Press to start the GAME
             </button>
         }
         {
           board
           && gameState === GAME_STATE.PLAYING
-          && <button type="button" className="btn btn-secondary" onClick={e => (board.pause())}>
+          && <button type="button" className="btn btn-secondary" onClick={() => (board.pause())}>
             PAUSE
             </button>
         }
         {
           board
           && gameState === GAME_STATE.PAUSED
-          && <button type="button" className="btn btn-info" onClick={e => (board.unpause())}>
+          && <button type="button" className="btn btn-info" onClick={() => (board.unpause())}>
             CONTINUE
             </button>
         }
         {
           board
           && gameState === GAME_STATE.FINISHED
-          && <button type="button" className="btn btn-danger" onClick={e => (board.restart())}>
+          && <button type="button" className="btn btn-danger" onClick={() => (board.restart())}>
             {pretifyGameState(gameState)} - RESTART
             </button>
         }
