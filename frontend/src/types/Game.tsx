@@ -338,7 +338,6 @@ export class GamePiece {
   }
 
   canMove(board: Board) {
-    // Jeito burro de fazer: testando
     const possiblePositions = new Map<string, HexDirection>();
     Array.from(board.pieces.values()).forEach(p => {
       hexDirections.forEach(dir => {
@@ -376,13 +375,27 @@ export class GamePiece {
         }
       }
     }
+
+    const currentPlayer = board.getPlayer(board.currentPlayer);
+    if(
+      currentPlayer.moveCount === 3 
+      && this.type !== GAME_PIECE_TYPE.QUEEN
+      && Array.from(board.pieces.values()).some(p => 
+        p.type === GAME_PIECE_TYPE.QUEEN
+        && p.ownerId === currentPlayer.id
+        && p.state === PIECE_STATE.PLAYER
+      )
+    ) {
+      this.possibleMoves = [];
+      return this.possibleMoves;
+    } 
     
     if(
       this.state === PIECE_STATE.BOARD 
       && (
         board.brokeBoard(this)
         || Object.values(Object.fromEntries(board.pieces)).some(p => 
-          p.ownerId===board.currentPlayer 
+          p.ownerId===currentPlayer.id
           && p.type === GAME_PIECE_TYPE.QUEEN 
           && p.state === PIECE_STATE.PLAYER)
       )
@@ -480,7 +493,7 @@ export class GamePlayer {
   public username: string;
   public type: PLAYER_TYPE;
   public firstMove: boolean;
-  public moveCount?: number;
+  public moveCount: number;
   public canMove: boolean;
   public time: number;
 
@@ -889,9 +902,9 @@ export class Board {
       if(this.gameTree && !this.gameTree.active) this.gameTree.active = true;
       this.currentPlayer = loadedPieces.player;
       this.p1.firstMove = loadedPieces.p1.firstMove;
-      if(this.p1.moveCount) this.p1.moveCount--;
       this.p2.firstMove = loadedPieces.p2.firstMove;
-      if(this.p2.moveCount) this.p2.moveCount--;
+      if(this.getPlayer(this.currentPlayer).moveCount)
+        this.getPlayer(this.currentPlayer).moveCount--;
       this.pieces = loadedPieces.pieces;
       let possibleMoves = this.genAllPossiblesStates();
       if(possibleMoves.length === 0) {
