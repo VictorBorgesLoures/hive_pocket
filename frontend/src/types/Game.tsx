@@ -544,7 +544,7 @@ export enum GAME_STATE {
   WAITING = "waiting", // Esperando jogo começar
   PAUSED = "paused", // Jogo pausou
   FINISHED = "finished", // Terminou
-  PLAYING = "playing" // Jogando
+  PLAYING = "playing", // Jogando
 }
 
 export function pretifyGameState(gameState: GAME_STATE) {
@@ -552,7 +552,7 @@ export function pretifyGameState(gameState: GAME_STATE) {
     waiting: "START",
     paused: "PAUSED",
     finished: "GAME FINISHED",
-    playing: "...PLAYING..."
+    playing: "...PLAYING...",
   }
   return pretify[gameState];
 }
@@ -616,6 +616,7 @@ type GameTree = {
   player: string
   active: boolean
   children?: GameTree[]
+  heuristicValue?: number,
   p1: {
     firstMove: boolean
   }
@@ -623,6 +624,7 @@ type GameTree = {
     firstMove: boolean
   }
 }
+
 
 export class Board {
   public id: string;
@@ -644,6 +646,7 @@ export class Board {
   public mousePos: pos & {state: PIECE_STATE} = {x: 0, y: 0, state: PIECE_STATE.BOARD};
   public divisoryBoard: number = 8*30;
   public timerConfig: GAME_TIMER; 
+  private heuristicPlayer: string | undefined = undefined;
   public offSet: pos = {
     x: 0,
     y: 0,
@@ -747,6 +750,126 @@ export class Board {
     this.render = this.render.bind(this);
   }
 
+  loadState(state: GameTree) {
+    const pieces = this.gameTreeToPieces(state);
+    this.currentPlayer = state.player;
+    this.p1.firstMove = state.p1.firstMove;
+    this.p2.firstMove = state.p2.firstMove;
+    this.pieces = pieces;
+    //this.updateHooks()
+  }
+
+  static async minMax(
+    board: Board, 
+    state: GameTree, 
+    depth: number = 5
+  ): Promise<Board> {
+    if(!board.gameTree) return board;
+    board.setHeuristicPlayer();
+    board.pause();
+    const initialChildren = board.genAllPossiblesStates();
+    async function minMaxRecursivo(
+      board: Board, 
+      state: GameTree, 
+      currentDepth: number = 0, 
+      depth: number = 5,
+      visited: Set<string>
+    ): Promise<number> {
+      board.loadState(state);
+      
+      if(currentDepth === depth) {
+        return Board.getBoardHeuristicValue(board);
+      }    
+      const type: 'min' | 'max' = board.currentPlayer === board.heuristicPlayer ? 'max' : 'min';
+      state.children =  board.genAllPossiblesStates();
+  
+      if(state.children.length === 0) {
+        // Apenas invertendo o estado pois jogador não possui jogadas válidas.
+        const newPlayer = board.currentPlayer === board.p1.id ? board.p2.id : board.p1.id
+        const newState = {
+          ...state,
+          player: newPlayer
+        }
+        visited.add(state.value);
+        return minMaxRecursivo(board, newState, currentDepth + 1, depth, new Set(visited)); 
+      }
+      const values = await Promise.all(state.children.map(async move => {
+        if(visited.has(move.value)) return 0;
+        visited.add(state.value);
+        await new Promise(resolve => setTimeout(resolve, 0.000001));
+        return minMaxRecursivo(board, move, currentDepth + 1, depth, new Set(visited))
+      }))
+  
+      const value = type === 'max' 
+        ? Math.max(...values) // pegando maior elemento
+        : Math.min(...values) // pegando menor elemento
+      state.heuristicValue = value;
+      return value;
+    }
+    await minMaxRecursivo(board, state, 0, depth, new Set<string>());
+    board.unpause();
+    const newState = state.children?.reduce((prev, current) => {
+      return prev.heuristicValue && current.heuristicValue && prev.heuristicValue > current.heuristicValue
+        ? prev
+        : current
+    });
+    if(newState) {
+      console.log(newState)
+      const lastTree = board.getLastTree();
+      if(lastTree) {
+        lastTree.children = initialChildren;
+        lastTree.children?.forEach(s => {
+          if(s.value === newState.value) {
+            s.active = true;
+            board.getPlayer(board.currentPlayer).moveCount++;
+            board.loadState(s);
+            s.children = board.genAllPossiblesStates();
+          }
+        })
+      }
+    }
+    else 
+      board.loadState(state);
+    console.dir(board.gameTree, {depth: null})
+    board.updateHooks()
+    return board;
+  } 
+
+  setHeuristicPlayer() {
+    this.heuristicPlayer = this.currentPlayer;
+  }
+
+  static getBoardHeuristicValue(board: Board): number {
+    if(board.heuristicPlayer) {
+      let qtdMovimentosMax: number = 0;
+      let qtdNeighborsQueenMax: number = 0;
+      let qtdMovimentosMin: number = 0;
+      let qtdNeighborsQueenMin: number = 0;
+      board.pieces.forEach(p => {
+        if(p.ownerId == board.heuristicPlayer) {
+          const mov = p.getPossibleMoves(board).length;
+          qtdMovimentosMax += p.type === GAME_PIECE_TYPE.ANT && p.state === PIECE_STATE.BOARD ? 2*mov : mov
+          if(
+            p.state === PIECE_STATE.BOARD 
+            && p.type === GAME_PIECE_TYPE.QUEEN
+          )
+            qtdNeighborsQueenMax = board.getNeighbors({...p.pos})?.length || 1;
+        } else {
+          const mov = p.getPossibleMoves(board).length;
+          qtdMovimentosMin += p.type === GAME_PIECE_TYPE.ANT && p.state === PIECE_STATE.BOARD ? 2*mov : mov
+           if(
+            p.state === PIECE_STATE.BOARD 
+            && p.type === GAME_PIECE_TYPE.QUEEN
+          )
+            qtdNeighborsQueenMin = board.getNeighbors({...p.pos})?.length || 1;
+        }
+
+      })
+      return qtdMovimentosMax + qtdNeighborsQueenMin;
+    }
+    return 0;
+  }
+
   private genAllPossiblesStates(): GameTree[] {
     let newChildren: GameTree[] = [];
     let clonePieces = new Map(this.pieces);
@@ -763,10 +886,10 @@ export class Board {
             const id = this.insertGameState(this.genGameState(clonePieces));
             newChildren.push({
               value: id, 
-              active: false, player: 
-              this.currentPlayer == this.p1.id ? this.p2.id : this.p1.id, 
-              p1: {firstMove: this.p1.firstMove}, 
-              p2: {firstMove: this.p2.firstMove}
+              active: false, 
+              player: this.currentPlayer == this.p1.id ? this.p2.id : this.p1.id, 
+              p1: {firstMove: this.p1.firstMove ? this.currentPlayer != this.p1.id : this.p1.firstMove}, 
+              p2: {firstMove: this.p2.firstMove ? this.currentPlayer != this.p2.id : this.p2.firstMove}
             });
             clonePieces.delete(hashPosToKey(pm));
           })
@@ -778,7 +901,7 @@ export class Board {
     return Array.from(mapped.values());
   }
 
-  private saveGameState() {
+  saveGameState() {
     // Pego o último estado salvo na árvore,
     const lastTree = this.getLastTree();
     if(!lastTree) {
@@ -788,7 +911,8 @@ export class Board {
       const children = this.genAllPossiblesStates();
       this.gameTree = {
         value: id, 
-        active: true, children, 
+        active: true, 
+        children, 
         player: this.currentPlayer, 
         p1: {firstMove: this.p1.firstMove}, 
         p2: {firstMove: this.p2.firstMove}
@@ -839,7 +963,7 @@ export class Board {
     return id;
   }
 
-  private getLastTree(): GameTree | undefined {
+  getLastTree(): GameTree | undefined {
     if(!this.gameTree) {
       return undefined;
     } else {
@@ -1606,10 +1730,10 @@ export class Board {
   canvaClick(x: number, y: number) {
     switch(this.state) {
       case GAME_STATE.FINISHED:
-        toast.info("O jogo já acabou!");
+        toast.info("Game alerady finished!");
         return;
       case GAME_STATE.PAUSED:
-        toast.info("O jogo está pausado!");
+        toast.info("Game is paused!");
         return;
     }
     
@@ -1658,7 +1782,7 @@ export class Board {
 
   isOnBoard(_x: number, y: number) {
     if(!this.currentCanva) return false;
-    // Check if position is inside the board
+
     return (
       y >= this.divisoryBoard
       && y <= this.currentCanva.height
@@ -1671,14 +1795,13 @@ export class Board {
     const x = truePos ? xPos : xPos + this.offSet.x;
     const y = truePos ? yPos : yPos + this.offSet.y;
 
-    // Check if position is inside the board
     return !(
-        x <= border || // Left border
-        x >= this.currentCanva.width - border // Right border
+        x <= border ||
+        x >= this.currentCanva.width - border
         || (
           y >= (this.divisoryBoard - border)
-        )// Top border
-        || y >= this.currentCanva.height - border    // Bottom border
+        )
+        || y >= this.currentCanva.height - border
     );
   }
 
@@ -1697,20 +1820,17 @@ export class Board {
       return;
     }
 
-    // Save current context state
     ctx.save();
 
     ctx.beginPath();
 
-    // Set line properties for better visibility
     ctx.strokeStyle = stroke;
-    ctx.lineWidth = 2;  // Thicker line
-    ctx.globalAlpha = 0.8;  // More opaque
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = 0.8;
     
     const {x, y} = this.cubeToPixel(this.pixelToCube(xPos, yPos));
 
-    // Draw hexagon with slightly larger size for hover effect
-    const hoverSize = this.HEX_SIZE * 1.1;  // 10% larger than normal
+    const hoverSize = this.HEX_SIZE * 1.1;
     
     for (let i = 0; i < 6; i++) {
         const angle = Math.PI / 180 * (60 * i - 30);
@@ -1979,10 +2099,10 @@ export class Board {
     this.renderBoard();
     this.renderPlayerPieces();
     ctx.save();
-    this.renderBoardPieces();
     ctx.beginPath();
     ctx.rect(0, this.divisoryBoard, this.currentCanva.width, this.currentCanva.height);
     ctx.clip();
+    this.renderBoardPieces();
     this.drawHexHover(this.mousePos.x, this.mousePos.y, "rgba(235, 203, 61, 0.76)");
     ctx.restore();
   }

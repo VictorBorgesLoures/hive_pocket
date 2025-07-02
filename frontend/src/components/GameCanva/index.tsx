@@ -16,19 +16,15 @@ export default function Canva({ board }: CanvaProps) {
       boardRef.current = boardRef.current.addContext(canvaRef.current);
 
       await Board.preloadImages();
-      
-      // Animation loop function
       const animate = () => {
         boardRef.current.render();
+
         animationFrameRef.current = window.requestAnimationFrame(animate);
       };
-  
-      // Start the animation loop
       animate();
     };
 
     initCanvas();
-    // Cleanup function to cancel animation frame when component unmounts
     return () => {
       if (animationFrameRef.current) {
         window.cancelAnimationFrame(animationFrameRef.current);
