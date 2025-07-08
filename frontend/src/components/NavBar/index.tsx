@@ -27,8 +27,7 @@ export default () => {
     setInvert(prev => !prev);
   }, [username])
 
-  const boardSim = useCallback(async () => {
-    
+  const MiniMax = useCallback(async () => {
     if (board && board.state === GAME_STATE.PLAYING) {
       let lastState = board.getLastTree();
       if (lastState) {
@@ -39,9 +38,14 @@ export default () => {
           player: lastState.player,
           value: lastState.value,
           children: undefined
-        }, 2)
-        console.log("MELHOR VALOR", bestValue);
+        }, 3)
       }
+    }
+  }, [timer, board, animation])
+
+  const AlfaBeta = useCallback(async () => {
+    if (board) {
+      await Board.alfaBeta(board, 3);
     }
   }, [timer, board, animation])
 
@@ -80,8 +84,15 @@ export default () => {
         {
           board
           && board.gameTree
-          && <button type="button" className="btn btn-secondary" onClick={async () => boardSim()}>
-            Realizar jogada Minimax
+          && <button type="button" className="btn btn-secondary" onClick={async () => MiniMax()}>
+            Minimax
+          </button>
+        }
+        {
+          board
+          && board.gameTree
+          && <button type="button" className="btn btn-secondary" onClick={async () => AlfaBeta()}>
+            AlfaBeta
           </button>
         }
         {

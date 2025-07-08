@@ -545,6 +545,7 @@ export enum GAME_STATE {
   PAUSED = "paused", // Jogo pausou
   FINISHED = "finished", // Terminou
   PLAYING = "playing", // Jogando
+  CALCULATING = "calculating", // Calculando jogada
 }
 
 export function pretifyGameState(gameState: GAME_STATE) {
@@ -553,6 +554,7 @@ export function pretifyGameState(gameState: GAME_STATE) {
     paused: "PAUSED",
     finished: "GAME FINISHED",
     playing: "...PLAYING...",
+    calculating: "...CALCULATING...",
   }
   return pretify[gameState];
 }
@@ -616,7 +618,25 @@ type GameTree = {
   player: string
   active: boolean
   children?: GameTree[]
-  heuristicValue?: number,
+  p1: {
+    firstMove: boolean
+  }
+  p2: {
+    firstMove: boolean
+  }
+}
+
+type MinimaxGameTree = GameTree & {
+  heuristicValue: number,
+  children?: MinimaxGameTree[]
+}
+
+type AlfaBetaGameTree = {
+  value: string //GameState map id
+  player: string
+  active: boolean
+  children?: AlfaBetaGameTree[]
+  alphaBeta: number[],
   p1: {
     firstMove: boolean
   }
@@ -764,24 +784,31 @@ export class Board {
     state: GameTree, 
     depth: number = 5
   ): Promise<Board> {
-    if(!board.gameTree) return board;
+    if(!board.gameTree || board.state === GAME_STATE.CALCULATING) return board;
     board.setHeuristicPlayer();
-    board.pause();
+    board.calculating();
     const initialChildren = board.genAllPossiblesStates();
     async function minMaxRecursivo(
       board: Board, 
-      state: GameTree, 
+      state: MinimaxGameTree, 
       currentDepth: number = 0, 
       depth: number = 5,
-      visited: Set<string>
+      visited: Set<{value: string, currentPlayer: string}>
     ): Promise<number> {
+      if(visited.has({value: state.value, currentPlayer: state.player})) return 0;
+      visited.add({value: state.value, currentPlayer: state.player});
       board.loadState(state);
       
       if(currentDepth === depth) {
         return Board.getBoardHeuristicValue(board);
       }    
       const type: 'min' | 'max' = board.currentPlayer === board.heuristicPlayer ? 'max' : 'min';
-      state.children =  board.genAllPossiblesStates();
+      state.children =  board.genAllPossiblesStates().map(newState => (
+        {...newState,
+          heuristicValue: 0,
+          children: []
+        }
+      ));
   
       if(state.children.length === 0) {
         // Apenas invertendo o estado pois jogador não possui jogadas válidas.
@@ -790,15 +817,22 @@ export class Board {
           ...state,
           player: newPlayer
         }
-        visited.add(state.value);
-        return minMaxRecursivo(board, newState, currentDepth + 1, depth, new Set(visited)); 
+        
+        return await minMaxRecursivo(board, newState, currentDepth + 1, depth, visited); 
       }
-      const values = await Promise.all(state.children.map(async move => {
-        if(visited.has(move.value)) return 0;
-        visited.add(state.value);
+      const values: number[] = [];
+      for(const move of state.children) {
         await new Promise(resolve => setTimeout(resolve, 0.000001));
-        return minMaxRecursivo(board, move, currentDepth + 1, depth, new Set(visited))
-      }))
+        values.push(await minMaxRecursivo(board, {
+          ...move,
+          heuristicValue: 0
+        }, currentDepth + 1, depth, visited)) 
+      }
+      // Paralelismo: porém precisa criar um novo board, não vai autualizar
+      // const values = await Promise.all(state.children.map(async move => {
+      //   await new Promise(resolve => setTimeout(resolve, 0.000001));
+      //   return minMaxRecursivo(board, move, currentDepth + 1, depth, new Set(visited))
+      // }))
   
       const value = type === 'max' 
         ? Math.max(...values) // pegando maior elemento
@@ -806,10 +840,15 @@ export class Board {
       state.heuristicValue = value;
       return value;
     }
-    await minMaxRecursivo(board, state, 0, depth, new Set<string>());
-    board.unpause();
-    const newState = state.children?.reduce((prev, current) => {
-      return prev.heuristicValue && current.heuristicValue && prev.heuristicValue > current.heuristicValue
+    let visited = new Set<{value: string, currentPlayer: string}>();
+    let stateMinimax: MinimaxGameTree = {
+      ...state,
+      heuristicValue: 0,
+      children: []
+    }
+    await minMaxRecursivo(board, stateMinimax, 0, depth, visited);
+    const newState = stateMinimax.children?.reduce((prev, current) => {
+      return (prev as MinimaxGameTree).heuristicValue >= (current as MinimaxGameTree).heuristicValue
         ? prev
         : current
     });
@@ -831,7 +870,141 @@ export class Board {
     else 
       board.loadState(state);
     console.dir(board.gameTree, {depth: null})
-    board.updateHooks()
+    board.uncalculating();
+    board.updateHooks();    
+    console.log(`Nodes Visited: ${visited.size}`)
+    console.log(`Generated States: ${board.gameStates.size}`)
+    return board;
+  } 
+
+  static async alfaBeta(
+    board: Board, 
+    depth: number = 5
+  ): Promise<Board> {
+    if(board.state === GAME_STATE.CALCULATING) return board;
+    let state = {...board.getLastTree()};
+    if(!state) return board;
+    let alphaBetaState: AlfaBetaGameTree = {...(state as GameTree), alphaBeta: [-Infinity, +Infinity], children: []}
+    board.setHeuristicPlayer();
+    board.calculating();
+    const initialChildren = board.genAllPossiblesStates();
+    async function alfaBetaRecursivo(
+      board: Board, 
+      state: AlfaBetaGameTree,
+      parentAlfaBeta: number[],
+      currentDepth: number, 
+      depth: number,
+      visited: Set<{value: string, currentPlayer: string}>
+    ): Promise<number | null> {
+      if(visited.has({value: state.value, currentPlayer: state.player})) return null;
+      visited.add({value: state.value, currentPlayer: state.player});
+      board.loadState(state);
+      
+      if(currentDepth === depth) {
+        return Board.getBoardHeuristicValue(board);
+      }    
+      const type: 'min' | 'max' = board.currentPlayer === board.heuristicPlayer ? 'max' : 'min';
+      state.children = board.genAllPossiblesStates().map(newState => (
+        {
+          ...newState,
+          alphaBeta: [-Infinity, +Infinity],
+          children: []
+        }
+      ));
+  
+      if(state.children.length === 0) {
+        // Apenas invertendo o estado pois jogador não possui jogadas válidas.
+        const newPlayer = board.currentPlayer === board.p1.id ? board.p2.id : board.p1.id
+        const newState = {
+          ...state,
+          alphaBeta: [-Infinity, +Infinity],
+          player: newPlayer
+        }        
+        const value = await alfaBetaRecursivo(board, newState, state.alphaBeta, currentDepth + 1, depth, visited); 
+        if(value) {
+          switch(type) {
+            case 'min':
+              state.alphaBeta[1] = value < state.alphaBeta[1] ? value : state.alphaBeta[1] 
+              break;
+            case 'max':
+              state.alphaBeta[0] = value > state.alphaBeta[0] ? value : state.alphaBeta[0] 
+              break;
+          }
+        }
+        state.alphaBeta = state.alphaBeta[0] < state.alphaBeta[1]
+          ? [state.alphaBeta[1],state.alphaBeta[1]]
+          : [state.alphaBeta[0], state.alphaBeta[0]]
+
+        return type == 'max'
+          ? state.alphaBeta[0]
+          : state.alphaBeta[1];
+      }
+
+      for(const move of state.children) {
+        await new Promise(resolve => setTimeout(resolve, 0.000001));
+        const value = await alfaBetaRecursivo(board, move, state.alphaBeta, currentDepth + 1, depth, visited)
+        if(value) {
+          switch(type) {
+            case 'min':
+              state.alphaBeta[1] = value < state.alphaBeta[1] ? value : state.alphaBeta[1] 
+              break;
+            case 'max':
+              state.alphaBeta[0] = value > state.alphaBeta[0] ? value : state.alphaBeta[0] 
+              break;
+          }
+          // Checar se com o novo valor de min e max precisa parar
+          if(type === 'min') {
+            // Minimização // Parente é max
+            // Se o valor do beta[1] (atual) for menor que o alfa[0](parente) -> para
+            if(state.alphaBeta[1] < parentAlfaBeta[0])
+              break;
+          } else {
+            // Maximização // Parente é min
+            // Se o valor de alfa[0] (atual) for maior que o de beta[1](parente) -> para
+            if(state.alphaBeta[0] > parentAlfaBeta[1])
+              break;
+          }
+        }
+      }
+
+      state.alphaBeta = state.alphaBeta[0] < state.alphaBeta[1]
+        ? [state.alphaBeta[1],state.alphaBeta[1]]
+        : [state.alphaBeta[0], state.alphaBeta[0]]
+
+      return type == 'max'
+        ? state.alphaBeta[0]
+        : state.alphaBeta[1];
+    }
+    let visited = new Set<{value: string, currentPlayer: string}>();
+    await alfaBetaRecursivo(board, alphaBetaState, [-Infinity, +Infinity], 0, depth, visited);
+    //precisa mudar essa lógica de baixo
+    const newState = alphaBetaState.children?.reduce((prev, current) => {
+      // Estamos maximizando, nó raiz, procurar melhor valor de alpha
+      return prev.alphaBeta[0] >= current.alphaBeta[0]
+         ? prev
+         : current
+    });
+    if(newState) {
+      const lastTree = board.getLastTree();
+      if(lastTree) {
+        lastTree.children = initialChildren;
+        lastTree.children?.forEach(s => {
+          if(s.value === newState.value) {
+            s.active = true;
+            board.getPlayer(board.currentPlayer).moveCount++;
+            board.loadState(s);
+            s.children = board.genAllPossiblesStates();
+          }
+        })
+      }
+    }
+    else 
+      board.loadState(state as GameTree);
+    console.dir(board.gameTree, {depth: null})
+    board.uncalculating();
+    board.updateHooks();
+    console.log(`Nodes Visited: ${visited.size}`)
+    console.log(`Generated States: ${board.gameStates.size}`)
     return board;
   } 
 
@@ -865,7 +1038,7 @@ export class Board {
         }
 
       })
-      return qtdMovimentosMax + qtdNeighborsQueenMin;
+      return qtdMovimentosMax - qtdMovimentosMin + 2*qtdNeighborsQueenMin - qtdNeighborsQueenMax;
     }
     return 0;
   }
@@ -1346,13 +1519,31 @@ export class Board {
   }
 
   pause() {
-    this.state = GAME_STATE.PAUSED;
-    this.updateHooks();
+    if(this.state === GAME_STATE.PLAYING) {
+      this.state = GAME_STATE.PAUSED;
+      this.updateHooks();
+    }
   }
 
   unpause() {
-    this.state = GAME_STATE.PLAYING;
-    this.updateHooks();
+    if(this.state === GAME_STATE.PAUSED) {
+      this.state = GAME_STATE.PLAYING;
+      this.updateHooks();
+    }
+  }
+
+  calculating() {
+    if(this.state === GAME_STATE.PLAYING) {
+      this.state = GAME_STATE.CALCULATING
+      this.updateHooks();
+    }
+  }
+
+  uncalculating() {
+    if(this.state === GAME_STATE.CALCULATING) {
+      this.state = GAME_STATE.PLAYING
+      this.updateHooks();
+    }
   }
 
   restart() {
@@ -1728,13 +1919,9 @@ export class Board {
   }
 
   canvaClick(x: number, y: number) {
-    switch(this.state) {
-      case GAME_STATE.FINISHED:
-        toast.info("Game alerady finished!");
-        return;
-      case GAME_STATE.PAUSED:
-        toast.info("Game is paused!");
-        return;
+    if(this.state !== GAME_STATE.PLAYING) {
+      toast.info("You must be playing to intereact with the board");
+      return;
     }
     
     const pos: HexDirection = this.pixelToCube(x, y);
@@ -1755,6 +1942,7 @@ export class Board {
   }
 
   canvaDrop(x: number, y: number) {
+    if(this.state !== GAME_STATE.PLAYING) return;
     this.pieces.forEach(p => {
       if(p.draggable.isDragging) {
         p.draggable.isDragging = false;
@@ -1765,6 +1953,7 @@ export class Board {
   }
 
   canvaMove(x: number, y: number) {
+    if(this.state !== GAME_STATE.PLAYING) return;
     this.mousePos = {...this.mousePos, x, y};
     this.pieces.forEach(p => {
       if(p.draggable.isDragging) {
