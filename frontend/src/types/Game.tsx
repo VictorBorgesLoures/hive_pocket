@@ -627,22 +627,13 @@ type GameTree = {
 }
 
 type MinimaxGameTree = GameTree & {
-  heuristicValue: number,
+  heuristicValue: number
   children?: MinimaxGameTree[]
 }
 
-type AlfaBetaGameTree = {
-  value: string //GameState map id
-  player: string
-  active: boolean
+type AlfaBetaGameTree = GameTree & {
   children?: AlfaBetaGameTree[]
-  alphaBeta: number[],
-  p1: {
-    firstMove: boolean
-  }
-  p2: {
-    firstMove: boolean
-  }
+  alphaBeta: number[]
 }
 
 
@@ -780,11 +771,13 @@ export class Board {
   }
 
   static async minMax(
-    board: Board, 
-    state: GameTree, 
+    board: Board,
     depth: number = 5
   ): Promise<Board> {
-    if(!board.gameTree || board.state === GAME_STATE.CALCULATING) return board;
+    if(board.state === GAME_STATE.CALCULATING) return board;
+    let state = {...board.getLastTree()};
+    if(!state) return board;
+    let miniMaxState: MinimaxGameTree = {...(state as GameTree), heuristicValue: 0, children: []}
     board.setHeuristicPlayer();
     board.calculating();
     const initialChildren = board.genAllPossiblesStates();
@@ -793,10 +786,10 @@ export class Board {
       state: MinimaxGameTree, 
       currentDepth: number = 0, 
       depth: number = 5,
-      visited: Set<{value: string, currentPlayer: string}>
-    ): Promise<number> {
-      if(visited.has({value: state.value, currentPlayer: state.player})) return 0;
-      visited.add({value: state.value, currentPlayer: state.player});
+      visited: Set<string>
+    ): Promise<number | null> {
+      if(visited.has(`${state.value}-${state.player}`)) return null;
+      visited.add(`${state.value}-${state.player}`);
       board.loadState(state);
       
       if(currentDepth === depth) {
@@ -822,11 +815,14 @@ export class Board {
       }
       const values: number[] = [];
       for(const move of state.children) {
-        await new Promise(resolve => setTimeout(resolve, 0.000001));
-        values.push(await minMaxRecursivo(board, {
+        await new Promise(requestAnimationFrame);
+        const value = await minMaxRecursivo(board, {
           ...move,
           heuristicValue: 0
-        }, currentDepth + 1, depth, visited)) 
+        }, currentDepth + 1, depth, visited)
+        if(value != null) {
+          values.push(value)
+        }
       }
       // Paralelismo: porém precisa criar um novo board, não vai autualizar
       // const values = await Promise.all(state.children.map(async move => {
@@ -840,20 +836,14 @@ export class Board {
       state.heuristicValue = value;
       return value;
     }
-    let visited = new Set<{value: string, currentPlayer: string}>();
-    let stateMinimax: MinimaxGameTree = {
-      ...state,
-      heuristicValue: 0,
-      children: []
-    }
-    await minMaxRecursivo(board, stateMinimax, 0, depth, visited);
-    const newState = stateMinimax.children?.reduce((prev, current) => {
+    let visited = new Set<string>();
+    await minMaxRecursivo(board, miniMaxState, 0, depth, visited);
+    const newState = miniMaxState.children?.reduce((prev, current) => {
       return (prev as MinimaxGameTree).heuristicValue >= (current as MinimaxGameTree).heuristicValue
         ? prev
         : current
     });
     if(newState) {
-      console.log(newState)
       const lastTree = board.getLastTree();
       if(lastTree) {
         lastTree.children = initialChildren;
@@ -868,12 +858,12 @@ export class Board {
       }
     }
     else 
-      board.loadState(state);
+      board.loadState(state as GameTree);
     console.dir(board.gameTree, {depth: null})
     board.uncalculating();
     board.updateHooks();    
     console.log(`Nodes Visited: ${visited.size}`)
-    console.log(`Generated States: ${board.gameStates.size}`)
+    console.log(`ALL Generated States: ${board.gameStates.size}`)
     return board;
   } 
 
@@ -894,10 +884,10 @@ export class Board {
       parentAlfaBeta: number[],
       currentDepth: number, 
       depth: number,
-      visited: Set<{value: string, currentPlayer: string}>
+      visited: Set<string>
     ): Promise<number | null> {
-      if(visited.has({value: state.value, currentPlayer: state.player})) return null;
-      visited.add({value: state.value, currentPlayer: state.player});
+       if(visited.has(`${state.value}-${state.player}`)) return 0;
+      visited.add(`${state.value}-${state.player}`);
       board.loadState(state);
       
       if(currentDepth === depth) {
@@ -907,7 +897,7 @@ export class Board {
       state.children = board.genAllPossiblesStates().map(newState => (
         {
           ...newState,
-          alphaBeta: [-Infinity, +Infinity],
+          alphaBeta: [...state.alphaBeta],
           children: []
         }
       ));
@@ -917,11 +907,11 @@ export class Board {
         const newPlayer = board.currentPlayer === board.p1.id ? board.p2.id : board.p1.id
         const newState = {
           ...state,
-          alphaBeta: [-Infinity, +Infinity],
+          alphaBeta: [...state.alphaBeta],
           player: newPlayer
         }        
         const value = await alfaBetaRecursivo(board, newState, state.alphaBeta, currentDepth + 1, depth, visited); 
-        if(value) {
+        if(value !== null) {
           switch(type) {
             case 'min':
               state.alphaBeta[1] = value < state.alphaBeta[1] ? value : state.alphaBeta[1] 
@@ -934,16 +924,15 @@ export class Board {
         state.alphaBeta = state.alphaBeta[0] < state.alphaBeta[1]
           ? [state.alphaBeta[1],state.alphaBeta[1]]
           : [state.alphaBeta[0], state.alphaBeta[0]]
-
         return type == 'max'
           ? state.alphaBeta[0]
           : state.alphaBeta[1];
       }
 
       for(const move of state.children) {
-        await new Promise(resolve => setTimeout(resolve, 0.000001));
+        await new Promise(requestAnimationFrame);
         const value = await alfaBetaRecursivo(board, move, state.alphaBeta, currentDepth + 1, depth, visited)
-        if(value) {
+        if(value !== null) {
           switch(type) {
             case 'min':
               state.alphaBeta[1] = value < state.alphaBeta[1] ? value : state.alphaBeta[1] 
@@ -956,13 +945,17 @@ export class Board {
           if(type === 'min') {
             // Minimização // Parente é max
             // Se o valor do beta[1] (atual) for menor que o alfa[0](parente) -> para
-            if(state.alphaBeta[1] < parentAlfaBeta[0])
+            if(state.alphaBeta[1] <= parentAlfaBeta[0]) {
+              console.log("CUTTING")
               break;
+            }
           } else {
             // Maximização // Parente é min
             // Se o valor de alfa[0] (atual) for maior que o de beta[1](parente) -> para
-            if(state.alphaBeta[0] > parentAlfaBeta[1])
+            if(state.alphaBeta[0] >= parentAlfaBeta[1]) {
+              console.log("CUTTING")
               break;
+            }
           }
         }
       }
@@ -975,15 +968,21 @@ export class Board {
         ? state.alphaBeta[0]
         : state.alphaBeta[1];
     }
-    let visited = new Set<{value: string, currentPlayer: string}>();
-    await alfaBetaRecursivo(board, alphaBetaState, [-Infinity, +Infinity], 0, depth, visited);
-    //precisa mudar essa lógica de baixo
+    let visited = new Set<string>();
+    const value = await alfaBetaRecursivo(board, alphaBetaState, [-Infinity, +Infinity], 0, depth, visited);
+    if(value !== null) {
+      alphaBetaState.alphaBeta[0] = value;
+      if(alphaBetaState.alphaBeta[1] > alphaBetaState.alphaBeta[0]) {
+        alphaBetaState.alphaBeta[1] = alphaBetaState.alphaBeta[0];
+      }
+    }
     const newState = alphaBetaState.children?.reduce((prev, current) => {
       // Estamos maximizando, nó raiz, procurar melhor valor de alpha
-      return prev.alphaBeta[0] >= current.alphaBeta[0]
+      return (prev as AlfaBetaGameTree).alphaBeta[0] >= (current as AlfaBetaGameTree).alphaBeta[0]
          ? prev
          : current
     });
+    console.dir(newState, {depth: null})
     if(newState) {
       const lastTree = board.getLastTree();
       if(lastTree) {
@@ -1004,7 +1003,7 @@ export class Board {
     board.uncalculating();
     board.updateHooks();
     console.log(`Nodes Visited: ${visited.size}`)
-    console.log(`Generated States: ${board.gameStates.size}`)
+    console.log(`ALL Generated States: ${board.gameStates.size}`)
     return board;
   } 
 
@@ -1013,34 +1012,31 @@ export class Board {
   }
 
   static getBoardHeuristicValue(board: Board): number {
-    if(board.heuristicPlayer) {
-      let qtdMovimentosMax: number = 0;
-      let qtdNeighborsQueenMax: number = 0;
-      let qtdMovimentosMin: number = 0;
-      let qtdNeighborsQueenMin: number = 0;
-      board.pieces.forEach(p => {
-        if(p.ownerId == board.heuristicPlayer) {
-          const mov = p.getPossibleMoves(board).length;
-          qtdMovimentosMax += p.type === GAME_PIECE_TYPE.ANT && p.state === PIECE_STATE.BOARD ? 2*mov : mov
+    let qtdMovimentosMax: number = 0;
+    let qtdNeighborsQueenMax: number = 0;
+    let qtdMovimentosMin: number = 0;
+    let qtdNeighborsQueenMin: number = 0;
+    board.pieces.forEach(p => {
+      if(p.ownerId == board.heuristicPlayer) {
+        const mov = p.getPossibleMoves(board).length;
+        qtdMovimentosMax += p.type === GAME_PIECE_TYPE.ANT && p.state === PIECE_STATE.BOARD ? 2*mov : mov
+        if(
+          p.state === PIECE_STATE.BOARD 
+          && p.type === GAME_PIECE_TYPE.QUEEN
+        )
+          qtdNeighborsQueenMax = board.getNeighbors({...p.pos})?.length || 1;
+      } else {
+        const mov = p.getPossibleMoves(board).length;
+        qtdMovimentosMin += p.type === GAME_PIECE_TYPE.ANT && p.state === PIECE_STATE.BOARD ? 2*mov : mov
           if(
-            p.state === PIECE_STATE.BOARD 
-            && p.type === GAME_PIECE_TYPE.QUEEN
-          )
-            qtdNeighborsQueenMax = board.getNeighbors({...p.pos})?.length || 1;
-        } else {
-          const mov = p.getPossibleMoves(board).length;
-          qtdMovimentosMin += p.type === GAME_PIECE_TYPE.ANT && p.state === PIECE_STATE.BOARD ? 2*mov : mov
-           if(
-            p.state === PIECE_STATE.BOARD 
-            && p.type === GAME_PIECE_TYPE.QUEEN
-          )
-            qtdNeighborsQueenMin = board.getNeighbors({...p.pos})?.length || 1;
-        }
+          p.state === PIECE_STATE.BOARD 
+          && p.type === GAME_PIECE_TYPE.QUEEN
+        )
+          qtdNeighborsQueenMin = board.getNeighbors({...p.pos})?.length || 1;
+      }
 
-      })
-      return qtdMovimentosMax - qtdMovimentosMin + 2*qtdNeighborsQueenMin - qtdNeighborsQueenMax;
-    }
-    return 0;
+    })
+    return 2*qtdMovimentosMax - qtdMovimentosMin + 2*qtdNeighborsQueenMin - qtdNeighborsQueenMax;
   }
 
   private genAllPossiblesStates(): GameTree[] {

@@ -2,7 +2,7 @@ import { Link } from "react-router-dom"
 import Timer from "@src/components/Timer"
 import { useBoard } from "@src/providers/Game";
 import { useCallback, useEffect, useState } from "react";
-import { GameHookState, GAME_STATE, pretifyGameState, Board, BoardConstructor } from "@src/types";
+import { GameHookState, GAME_STATE, pretifyGameState, Board } from "@src/types";
 
 export default () => {
   const { board } = useBoard();
@@ -28,18 +28,8 @@ export default () => {
   }, [username])
 
   const MiniMax = useCallback(async () => {
-    if (board && board.state === GAME_STATE.PLAYING) {
-      let lastState = board.getLastTree();
-      if (lastState) {
-        const bestValue = await Board.minMax(board, {
-          active: lastState.active,
-          p1: lastState.p1,
-          p2: lastState.p2,
-          player: lastState.player,
-          value: lastState.value,
-          children: undefined
-        }, 3)
-      }
+    if (board) {
+      await Board.minMax(board, 2)
     }
   }, [timer, board, animation])
 
