@@ -810,12 +810,18 @@ export class Board {
           ...state,
           player: newPlayer
         }
-        
-        return await minMaxRecursivo(board, newState, currentDepth + 1, depth, visited); 
+        board.currentPlayer = state.player;
+        board.getPlayer(board.currentPlayer).moveCount++;
+        const value = await minMaxRecursivo(board, newState, currentDepth + 1, depth, visited); 
+        board.currentPlayer = state.player;
+        board.getPlayer(board.currentPlayer).moveCount--;
+        return value;
       }
       const values: number[] = [];
       for(const move of state.children) {
         await new Promise(requestAnimationFrame);
+        board.currentPlayer = state.player;
+        board.getPlayer(board.currentPlayer).moveCount++;
         const value = await minMaxRecursivo(board, {
           ...move,
           heuristicValue: 0
@@ -823,6 +829,8 @@ export class Board {
         if(value != null) {
           values.push(value)
         }
+        board.currentPlayer = state.player;
+        board.getPlayer(board.currentPlayer).moveCount--;
       }
       // Paralelismo: porém precisa criar um novo board, não vai autualizar
       // const values = await Promise.all(state.children.map(async move => {
@@ -843,19 +851,17 @@ export class Board {
         ? prev
         : current
     });
-    if(newState) {
-      const lastTree = board.getLastTree();
-      if(lastTree) {
-        lastTree.children = initialChildren;
-        lastTree.children?.forEach(s => {
-          if(s.value === newState.value) {
-            s.active = true;
-            board.getPlayer(board.currentPlayer).moveCount++;
-            board.loadState(s);
-            s.children = board.genAllPossiblesStates();
-          }
-        })
-      }
+    const lastTree = board.getLastTree();
+    if(newState && lastTree) {
+      lastTree.children = initialChildren;
+      lastTree.children?.forEach(s => {
+        if(s.value === newState.value) {
+          s.active = true;
+          board.getPlayer(board.currentPlayer).moveCount++;
+          board.loadState(s);
+          s.children = board.genAllPossiblesStates();
+        }
+      })
     }
     else 
       board.loadState(state as GameTree);
@@ -910,7 +916,9 @@ export class Board {
           alphaBeta: [...state.alphaBeta],
           player: newPlayer
         }        
+        board.getPlayer(state.player).moveCount++;
         const value = await alfaBetaRecursivo(board, newState, state.alphaBeta, currentDepth + 1, depth, visited); 
+        board.getPlayer(state.player).moveCount--;
         if(value !== null) {
           switch(type) {
             case 'min':
@@ -931,7 +939,9 @@ export class Board {
 
       for(const move of state.children) {
         await new Promise(requestAnimationFrame);
-        const value = await alfaBetaRecursivo(board, move, state.alphaBeta, currentDepth + 1, depth, visited)
+        board.getPlayer(state.player).moveCount++;
+        const value = await alfaBetaRecursivo(board, move, state.alphaBeta, currentDepth + 1, depth, visited);
+        board.getPlayer(state.player).moveCount--;
         if(value !== null) {
           switch(type) {
             case 'min':
@@ -982,20 +992,17 @@ export class Board {
          ? prev
          : current
     });
-    console.dir(newState, {depth: null})
-    if(newState) {
-      const lastTree = board.getLastTree();
-      if(lastTree) {
-        lastTree.children = initialChildren;
-        lastTree.children?.forEach(s => {
-          if(s.value === newState.value) {
-            s.active = true;
-            board.getPlayer(board.currentPlayer).moveCount++;
-            board.loadState(s);
-            s.children = board.genAllPossiblesStates();
-          }
-        })
-      }
+    const lastTree = board.getLastTree();
+    if(newState && lastTree) {
+      lastTree.children = initialChildren;
+      lastTree.children?.forEach(s => {
+        if(s.value === newState.value) {
+          s.active = true;
+          board.getPlayer(board.currentPlayer).moveCount++;
+          board.loadState(s);
+          s.children = board.genAllPossiblesStates();
+        }
+      })
     }
     else 
       board.loadState(state as GameTree);
@@ -1194,10 +1201,10 @@ export class Board {
       if(lastTree) lastTree.active = false;
       if(this.gameTree && !this.gameTree.active) this.gameTree.active = true;
       this.currentPlayer = loadedPieces.player;
-      this.p1.firstMove = loadedPieces.p1.firstMove;
-      this.p2.firstMove = loadedPieces.p2.firstMove;
       if(this.getPlayer(this.currentPlayer).moveCount)
         this.getPlayer(this.currentPlayer).moveCount--;
+      this.p1.firstMove = loadedPieces.p1.firstMove;
+      this.p2.firstMove = loadedPieces.p2.firstMove;
       this.pieces = loadedPieces.pieces;
       let possibleMoves = this.genAllPossiblesStates();
       if(possibleMoves.length === 0) {

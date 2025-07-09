@@ -29,13 +29,13 @@ export default () => {
 
   const MiniMax = useCallback(async () => {
     if (board) {
-      await Board.minMax(board, 2)
+      await Board.minMax(board, 1)
     }
   }, [timer, board, animation])
 
   const AlfaBeta = useCallback(async () => {
     if (board) {
-      await Board.alfaBeta(board, 3);
+      await Board.alfaBeta(board, 2);
     }
   }, [timer, board, animation])
 
