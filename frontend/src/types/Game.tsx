@@ -988,12 +988,15 @@ export class Board {
     }
     let visited = new Set<string>();
     await minMaxRecursivo(board, miniMaxState, 0, depth, visited);
-    const newState = miniMaxState.children?.reduce((prev, current) => {
-      return (prev as MinimaxGameTree).heuristicValue >=
-        (current as MinimaxGameTree).heuristicValue
-        ? prev
-        : current;
-    });
+    const newState =
+      miniMaxState.children && miniMaxState.children.length
+        ? miniMaxState.children.reduce((prev, current) => {
+            return (prev as MinimaxGameTree).heuristicValue >=
+              (current as MinimaxGameTree).heuristicValue
+              ? prev
+              : current;
+          })
+        : null;
     const lastTree = board.getLastTree();
     if (newState && lastTree) {
       lastTree.children = initialChildren;
@@ -1011,6 +1014,21 @@ export class Board {
     board.updateHooks();
     console.log(`Nodes Visited: ${visited.size}`);
     console.log(`ALL Generated States: ${board.gameStates.size}`);
+    if (board.gameHasEnded()) {
+      toast.info("THE GAME HAS FINISHED!!");
+      if (board.winner === "") {
+        toast.warning("The game ended with a DRAW :(");
+        toast.info("Click on GAME FINISHED to restart the game!");
+      } else {
+        toast.success(
+          `CONGRATULATIONS!!! ${
+            board.getPlayer(board.winner).username
+          }, WON!!!!`
+        );
+      }
+      board.state = GAME_STATE.FINISHED;
+      board.updateHooks();
+    }
     return board;
   }
 
@@ -1151,13 +1169,16 @@ export class Board {
         alphaBetaState.alphaBeta[1] = alphaBetaState.alphaBeta[0];
       }
     }
-    const newState = alphaBetaState.children?.reduce((prev, current) => {
-      // Estamos maximizando, nó raiz, procurar melhor valor de alpha
-      return (prev as AlfaBetaGameTree).alphaBeta[0] >=
-        (current as AlfaBetaGameTree).alphaBeta[0]
-        ? prev
-        : current;
-    });
+    const newState =
+      alphaBetaState.children && alphaBetaState.children?.length
+        ? alphaBetaState.children?.reduce((prev, current) => {
+            // Estamos maximizando, nó raiz, procurar melhor valor de alpha
+            return (prev as AlfaBetaGameTree).alphaBeta[0] >=
+              (current as AlfaBetaGameTree).alphaBeta[0]
+              ? prev
+              : current;
+          })
+        : null;
     const lastTree = board.getLastTree();
     if (newState && lastTree) {
       lastTree.children = initialChildren;
@@ -1175,6 +1196,21 @@ export class Board {
     board.updateHooks();
     console.log(`Nodes Visited: ${visited.size}`);
     console.log(`ALL Generated States: ${board.gameStates.size}`);
+    if (board.gameHasEnded()) {
+      toast.info("THE GAME HAS FINISHED!!");
+      if (board.winner === "") {
+        toast.warning("The game ended with a DRAW :(");
+        toast.info("Click on GAME FINISHED to restart the game!");
+      } else {
+        toast.success(
+          `CONGRATULATIONS!!! ${
+            board.getPlayer(board.winner).username
+          }, WON!!!!`
+        );
+      }
+      board.state = GAME_STATE.FINISHED;
+      board.updateHooks();
+    }
     return board;
   }
 
