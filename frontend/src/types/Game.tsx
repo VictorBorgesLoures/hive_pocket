@@ -1,8 +1,14 @@
-import { v1 } from 'uuid';
-import { AntIcon, BeetleIcon, GrasshopperIcon, QueenIcon, SpiderIcon } from '../components/Svgs';
-import { toast } from 'react-toastify';
-import ReactDOMServer from 'react-dom/server';
-import React from 'react';
+import { v1 } from "uuid";
+import {
+  AntIcon,
+  BeetleIcon,
+  GrasshopperIcon,
+  QueenIcon,
+  SpiderIcon,
+} from "../components/Svgs";
+import { toast } from "react-toastify";
+import ReactDOMServer from "react-dom/server";
+import React from "react";
 
 export enum GAME_PIECE_TYPE {
   QUEEN = "queen",
@@ -13,38 +19,59 @@ export enum GAME_PIECE_TYPE {
 }
 
 export interface HexDirection {
-  q: number,
-  r: number,
-  z: number,
+  q: number;
+  r: number;
+  z: number;
 }
 
 const hashPosToKey = (pos: HexDirection) => {
   return `${pos.q},${pos.r},${pos.z}`;
-}
+};
 
 export interface GamePieceConstructor {
-  id?: string,
-  pos: HexDirection,
-  type: GAME_PIECE_TYPE,
-  info?: Info,
-  ownerId: string,
-  state?: PIECE_STATE,
+  id?: string;
+  pos: HexDirection;
+  type: GAME_PIECE_TYPE;
+  info?: Info;
+  ownerId: string;
+  state?: PIECE_STATE;
 }
 
-const ValidAntMove = (board: Board, currentPiece: GamePiece, to: HexDirection): boolean => {
-  if (board.pieces.has(hashPosToKey(to)))
-    return false;
-  const moveAnt = (board: Board, currentPos: HexDirection, finalPos: HexDirection, alreadyVisited: HexDirection[]): boolean[] => {
-    if (alreadyVisited.some(pos => pos.q == currentPos.q && pos.r == currentPos.r && pos.z == currentPos.z)) {
-      return [false];
-    }
-    if (!(board.getNeighbors(currentPos)?.some(p => p?.state === PIECE_STATE.BOARD && p?.id != currentPiece.id))) {
+const ValidAntMove = (
+  board: Board,
+  currentPiece: GamePiece,
+  to: HexDirection
+): boolean => {
+  if (board.pieces.has(hashPosToKey(to))) return false;
+  const moveAnt = (
+    board: Board,
+    currentPos: HexDirection,
+    finalPos: HexDirection,
+    alreadyVisited: HexDirection[]
+  ): boolean[] => {
+    if (
+      alreadyVisited.some(
+        (pos) =>
+          pos.q == currentPos.q &&
+          pos.r == currentPos.r &&
+          pos.z == currentPos.z
+      )
+    ) {
       return [false];
     }
     if (
-      currentPos.q == finalPos.q
-      && currentPos.r == finalPos.r
-      && currentPos.z == finalPos.z
+      !board
+        .getNeighbors(currentPos)
+        ?.some(
+          (p) => p?.state === PIECE_STATE.BOARD && p?.id != currentPiece.id
+        )
+    ) {
+      return [false];
+    }
+    if (
+      currentPos.q == finalPos.q &&
+      currentPos.r == finalPos.r &&
+      currentPos.z == finalPos.z
     ) {
       // let increment = 1;
       // alreadyVisited.forEach(pos => {
@@ -68,32 +95,47 @@ const ValidAntMove = (board: Board, currentPiece: GamePiece, to: HexDirection): 
       return [true];
     }
     alreadyVisited.push(currentPos); // Add current position to already visited
-    const moves: boolean[] = hexDirections.map(dir => {
-      const nextPos = { q: currentPos.q + dir.q, r: currentPos.r + dir.r, z: currentPos.z };
+    const moves: boolean[] = hexDirections.map((dir) => {
+      const nextPos = {
+        q: currentPos.q + dir.q,
+        r: currentPos.r + dir.r,
+        z: currentPos.z,
+      };
       if (
-        board.pieces.has(hashPosToKey(nextPos))
-        || !board.canSlide(currentPos, nextPos, currentPiece.type, currentPiece.id)
+        board.pieces.has(hashPosToKey(nextPos)) ||
+        !board.canSlide(currentPos, nextPos, currentPiece.type, currentPiece.id)
       ) {
         return false;
       }
       const newMoves = moveAnt(board, nextPos, finalPos, alreadyVisited);
-      return newMoves.some(move => move);
+      return newMoves.some((move) => move);
     });
     alreadyVisited.pop();
     return moves;
-  }
+  };
   const alreadyVisited: HexDirection[] = [];
   const moves = moveAnt(board, currentPiece.pos, to, alreadyVisited);
-  return moves.some(move => move);
-}
+  return moves.some((move) => move);
+};
 
-const ValidBeetleMove = (board: Board, currentPiece: GamePiece, to: HexDirection): boolean => {
-  return hexDirections.some(dir => {
-    const nextPos = { q: currentPiece.pos.q + dir.q, r: currentPiece.pos.r + dir.r, z: 1 };
-    if (to.q == nextPos.q && to.r == nextPos.r && to.z == nextPos.z) { // Se a posição de destino é a posição de destino
-      if (board.pieces.has(GamePiece.hashPosToKey(nextPos))) { // Está subindo em cima, então é um movimento válido
+const ValidBeetleMove = (
+  board: Board,
+  currentPiece: GamePiece,
+  to: HexDirection
+): boolean => {
+  return hexDirections.some((dir) => {
+    const nextPos = {
+      q: currentPiece.pos.q + dir.q,
+      r: currentPiece.pos.r + dir.r,
+      z: 1,
+    };
+    if (to.q == nextPos.q && to.r == nextPos.r && to.z == nextPos.z) {
+      // Se a posição de destino é a posição de destino
+      if (board.pieces.has(GamePiece.hashPosToKey(nextPos))) {
+        // Está subindo em cima, então é um movimento válido
         return true;
-      } else if (currentPiece.pos.z > 1) { // Está descendo, portanto consegue se mover
+      } else if (currentPiece.pos.z > 1) {
+        // Está descendo, portanto consegue se mover
         return true;
       } else if (board.canSlide(currentPiece.pos, nextPos, currentPiece.type)) {
         return true;
@@ -101,19 +143,25 @@ const ValidBeetleMove = (board: Board, currentPiece: GamePiece, to: HexDirection
     }
     return false;
   });
-}
+};
 
-const ValidGrasshopperMove = (board: Board, currentPiece: GamePiece, to: HexDirection): boolean => {
-  if (board.pieces.has(hashPosToKey(to)))
-    return false;
+const ValidGrasshopperMove = (
+  board: Board,
+  currentPiece: GamePiece,
+  to: HexDirection
+): boolean => {
+  if (board.pieces.has(hashPosToKey(to))) return false;
   return Object.entries(hexDirectionsCardinal).some(([_key, dir]) => {
-    const nextPos = { q: currentPiece.pos.q + dir.q, r: currentPiece.pos.r + dir.r, z: 1 };
+    const nextPos = {
+      q: currentPiece.pos.q + dir.q,
+      r: currentPiece.pos.r + dir.r,
+      z: 1,
+    };
     if (nextPos.q == to.q && nextPos.r == to.r) {
       // Se mover apenas uma vez e chegar no destino é pq não pulou por cima de nenhuma peça
       return false;
     }
-    while (board.pieces.has(GamePiece.hashPosToKey(nextPos))
-    ) {
+    while (board.pieces.has(GamePiece.hashPosToKey(nextPos))) {
       nextPos.q += dir.q;
       nextPos.r += dir.r;
     }
@@ -122,43 +170,76 @@ const ValidGrasshopperMove = (board: Board, currentPiece: GamePiece, to: HexDire
     }
     return false;
   });
-}
+};
 
-const ValidQueenMove = (board: Board, currentPiece: GamePiece, to: HexDirection): boolean => {
-  if (board.pieces.has(hashPosToKey(to)))
-    return false;
-  return hexDirections.some(dir => {
-    const nextPos = { q: currentPiece.pos.q + dir.q, r: currentPiece.pos.r + dir.r, z: 1 };
-    if (to.q == nextPos.q && to.r == nextPos.r && to.z == nextPos.z) { // Se a posição de destino é a posição de destino
-      if (board.pieces.has(GamePiece.hashPosToKey(nextPos))) { // Está subindo em cima, então não é um movimento válido
+const ValidQueenMove = (
+  board: Board,
+  currentPiece: GamePiece,
+  to: HexDirection
+): boolean => {
+  if (board.pieces.has(hashPosToKey(to))) return false;
+  return hexDirections.some((dir) => {
+    const nextPos = {
+      q: currentPiece.pos.q + dir.q,
+      r: currentPiece.pos.r + dir.r,
+      z: 1,
+    };
+    if (to.q == nextPos.q && to.r == nextPos.r && to.z == nextPos.z) {
+      // Se a posição de destino é a posição de destino
+      if (board.pieces.has(GamePiece.hashPosToKey(nextPos))) {
+        // Está subindo em cima, então não é um movimento válido
         return false;
-      } else if (!board.canSlide(currentPiece.pos, nextPos, currentPiece.type)) {
+      } else if (
+        !board.canSlide(currentPiece.pos, nextPos, currentPiece.type)
+      ) {
         return false;
       }
       return true;
     }
     return false;
   });
-}
+};
 
-const ValidSpiderMove = (board: Board, currentPiece: GamePiece, to: HexDirection): boolean => {
-  if (board.pieces.has(hashPosToKey(to)))
-    return false;
-  const moveSpider = (board: Board, currentPos: HexDirection, finalPos: HexDirection, alreadyVisited: HexDirection[], currentMoves: number): boolean[] => {
+const ValidSpiderMove = (
+  board: Board,
+  currentPiece: GamePiece,
+  to: HexDirection
+): boolean => {
+  if (board.pieces.has(hashPosToKey(to))) return false;
+  const moveSpider = (
+    board: Board,
+    currentPos: HexDirection,
+    finalPos: HexDirection,
+    alreadyVisited: HexDirection[],
+    currentMoves: number
+  ): boolean[] => {
     if (currentMoves > 3) {
       return [false];
     }
-    if (alreadyVisited.some(pos => pos.q == currentPos.q && pos.r == currentPos.r && pos.z == currentPos.z)) {
+    if (
+      alreadyVisited.some(
+        (pos) =>
+          pos.q == currentPos.q &&
+          pos.r == currentPos.r &&
+          pos.z == currentPos.z
+      )
+    ) {
       return [false];
     }
-    if (!(board.getNeighbors(currentPos)?.some(p => p?.state === PIECE_STATE.BOARD && p?.id != currentPiece.id))) {
+    if (
+      !board
+        .getNeighbors(currentPos)
+        ?.some(
+          (p) => p?.state === PIECE_STATE.BOARD && p?.id != currentPiece.id
+        )
+    ) {
       return [false]; // Alguem vizinho diferente dela mesmo.
     }
     if (
-      currentPos.q == finalPos.q
-      && currentPos.r == finalPos.r
-      && currentPos.z == finalPos.z
-      && currentMoves == 3
+      currentPos.q == finalPos.q &&
+      currentPos.r == finalPos.r &&
+      currentPos.z == finalPos.z &&
+      currentMoves == 3
     ) {
       // let increment = 1;
       // alreadyVisited.forEach(pos => {
@@ -182,57 +263,74 @@ const ValidSpiderMove = (board: Board, currentPiece: GamePiece, to: HexDirection
       return [true];
     }
     alreadyVisited.push(currentPos); // Add current position to already visited
-    const moves: boolean[] = hexDirections.map(dir => {
-      const nextPos = { q: currentPos.q + dir.q, r: currentPos.r + dir.r, z: currentPos.z };
+    const moves: boolean[] = hexDirections.map((dir) => {
+      const nextPos = {
+        q: currentPos.q + dir.q,
+        r: currentPos.r + dir.r,
+        z: currentPos.z,
+      };
       if (
-        board.pieces.has(hashPosToKey(nextPos))
-        || !board.canSlide(currentPos, nextPos, currentPiece.type, currentPiece.id)
+        board.pieces.has(hashPosToKey(nextPos)) ||
+        !board.canSlide(currentPos, nextPos, currentPiece.type, currentPiece.id)
       ) {
         return false;
       }
-      const newMoves = moveSpider(board, nextPos, finalPos, alreadyVisited, currentMoves + 1);
-      return newMoves.some(move => move);
+      const newMoves = moveSpider(
+        board,
+        nextPos,
+        finalPos,
+        alreadyVisited,
+        currentMoves + 1
+      );
+      return newMoves.some((move) => move);
     });
     alreadyVisited.pop();
     return moves;
-  }
+  };
   const alreadyVisited: HexDirection[] = [];
   const moves = moveSpider(board, currentPiece.pos, to, alreadyVisited, 0);
-  return moves.some(move => move);
-}
+  return moves.some((move) => move);
+};
 
-const gamePieceMovements: Record<GAME_PIECE_TYPE, (board: Board, currentPiece: GamePiece, to: HexDirection) => boolean> = {
+const gamePieceMovements: Record<
+  GAME_PIECE_TYPE,
+  (board: Board, currentPiece: GamePiece, to: HexDirection) => boolean
+> = {
   ant: ValidAntMove,
   beetle: ValidBeetleMove,
   grasshopper: ValidGrasshopperMove,
   queen: ValidQueenMove,
   spider: ValidSpiderMove,
-}
+};
 
 export interface Info {
-  title: string,
-  subtitle?: string,
-  movement: string,
+  title: string;
+  subtitle?: string;
+  movement: string;
 }
 
 export const piecesInfo: Record<GAME_PIECE_TYPE, Info> = {
   ant: {
     movement: "It can move anywhere on the hive using the outside!",
     title: "Ant",
-    subtitle: "Unstoppable force, it can move anywhere with unlimited movement.",
+    subtitle:
+      "Unstoppable force, it can move anywhere with unlimited movement.",
   },
   beetle: {
-    movement: "Can move only one space! It can sit on top of other piece and block their movement!",
+    movement:
+      "Can move only one space! It can sit on top of other piece and block their movement!",
     title: "Beetle",
     subtitle: "Heavy wheight class, it can sit on top of others.",
   },
   grasshopper: {
-    movement: "Can jump over many pieces as want, you must choose one direction and jump!",
+    movement:
+      "Can jump over many pieces as want, you must choose one direction and jump!",
     title: "Grasshopper",
     subtitle: "The jumper, doesn't metter your height, it can jump over.",
   },
   queen: {
-    movement: "Can move only one piece! Must be positioned at most on the 4º round.",
+    movement:
+      "Can move only one piece! Must be positioned at most on the 4º round.",
     title: "Queen",
     subtitle: "The QUEEN, you must protect it with all your will and power!",
   },
@@ -241,7 +339,7 @@ export const piecesInfo: Record<GAME_PIECE_TYPE, Info> = {
     title: "Spider",
     subtitle: "The trapper, when you least expect, it is there.",
   },
-}
+};
 
 export const hexDirections: HexDirection[] = [
   { q: 1, r: 0, z: 1 },
@@ -249,25 +347,25 @@ export const hexDirections: HexDirection[] = [
   { q: 0, r: -1, z: 1 },
   { q: -1, r: 0, z: 1 },
   { q: -1, r: 1, z: 1 },
-  { q: 0, r: 1, z: 1 }
-]
+  { q: 0, r: 1, z: 1 },
+];
 
 export const hexDirectionsCardinal: Record<string, HexDirection> = {
-  "LESTE": { q: 1, r: 0, z: 1 },
-  "NORDESTE": { q: 1, r: -1, z: 1 },
-  "NOROESTE": { q: 0, r: -1, z: 1 },
-  "OESTE": { q: -1, r: 0, z: 1 },
-  "SUDOESTE": { q: -1, r: 1, z: 1 },
-  "SUDESTE": { q: 0, r: 1, z: 1 }
-}
+  LESTE: { q: 1, r: 0, z: 1 },
+  NORDESTE: { q: 1, r: -1, z: 1 },
+  NOROESTE: { q: 0, r: -1, z: 1 },
+  OESTE: { q: -1, r: 0, z: 1 },
+  SUDOESTE: { q: -1, r: 1, z: 1 },
+  SUDESTE: { q: 0, r: 1, z: 1 },
+};
 
 interface Drag {
-  isDragging: boolean,
-  isMoving: boolean,
+  isDragging: boolean;
+  isMoving: boolean;
   offSet: {
-    x: number,
-    y: number,
-  },
+    x: number;
+    y: number;
+  };
 }
 
 export const PIECE_TYPE_IMAGES: Record<GAME_PIECE_TYPE, React.FC> = {
@@ -276,7 +374,7 @@ export const PIECE_TYPE_IMAGES: Record<GAME_PIECE_TYPE, React.FC> = {
   [GAME_PIECE_TYPE.GRASSHOPPER]: GrasshopperIcon,
   [GAME_PIECE_TYPE.QUEEN]: QueenIcon,
   [GAME_PIECE_TYPE.SPIDER]: SpiderIcon,
-}
+};
 
 export const enum PIECE_STATE {
   BOARD = "board",
@@ -304,9 +402,13 @@ export class GamePiece {
     offSet: {
       x: 0,
       y: 0,
-    }
+    },
   };
-  public validMovement: (board: Board, currentPiece: GamePiece, to: HexDirection) => boolean;
+  public validMovement: (
+    board: Board,
+    currentPiece: GamePiece,
+    to: HexDirection
+  ) => boolean;
   public possibleMoves: HexDirection[] | null = null;
 
   constructor(args: GamePieceConstructor) {
@@ -314,12 +416,14 @@ export class GamePiece {
     this.pos = args.pos;
     this.type = args.type;
     this.info = args.info ? args.info : piecesInfo[this.type];
-    this.validMovement = (board: Board, currentPiece: GamePiece, to: HexDirection) => {
-      return (
-        currentPiece.pos.q === to.q && currentPiece.pos.r === to.r
-          ? false
-          : gamePieceMovements[this.type](board, currentPiece, to)
-      )
+    this.validMovement = (
+      board: Board,
+      currentPiece: GamePiece,
+      to: HexDirection
+    ) => {
+      return currentPiece.pos.q === to.q && currentPiece.pos.r === to.r
+        ? false
+        : gamePieceMovements[this.type](board, currentPiece, to);
     };
     this.ownerId = args.ownerId;
     this.state = args.state ? args.state : PIECE_STATE.PLAYER;
@@ -339,20 +443,22 @@ export class GamePiece {
 
   canMove(board: Board) {
     const possiblePositions = new Map<string, HexDirection>();
-    Array.from(board.pieces.values()).forEach(p => {
-      hexDirections.forEach(dir => {
+    Array.from(board.pieces.values()).forEach((p) => {
+      hexDirections.forEach((dir) => {
         const pos: HexDirection = {
           q: p.pos.q + dir.q,
           r: p.pos.r + dir.r,
-          z: 1
-        }
-        possiblePositions.set(hashPosToKey(pos), pos)
-      })
-    })
-    const canMove: boolean = Array.from(possiblePositions.values()).some(dir => {
-      const valid = this.validMovement(board, this, dir);
-      return valid;
-    })
+          z: 1,
+        };
+        possiblePositions.set(hashPosToKey(pos), pos);
+      });
+    });
+    const canMove: boolean = Array.from(possiblePositions.values()).some(
+      (dir) => {
+        const valid = this.validMovement(board, this, dir);
+        return valid;
+      }
+    );
 
     return canMove;
   }
@@ -378,12 +484,13 @@ export class GamePiece {
 
     const currentPlayer = board.getPlayer(board.currentPlayer);
     if (
-      currentPlayer.moveCount === 3
-      && this.type !== GAME_PIECE_TYPE.QUEEN
-      && Array.from(board.pieces.values()).some(p =>
-        p.type === GAME_PIECE_TYPE.QUEEN
-        && p.ownerId === currentPlayer.id
-        && p.state === PIECE_STATE.PLAYER
+      currentPlayer.moveCount === 3 &&
+      this.type !== GAME_PIECE_TYPE.QUEEN &&
+      Array.from(board.pieces.values()).some(
+        (p) =>
+          p.type === GAME_PIECE_TYPE.QUEEN &&
+          p.ownerId === currentPlayer.id &&
+          p.state === PIECE_STATE.PLAYER
       )
     ) {
       this.possibleMoves = [];
@@ -391,14 +498,14 @@ export class GamePiece {
     }
 
     if (
-      this.state === PIECE_STATE.BOARD
-      && (
-        board.brokeBoard(this)
-        || Object.values(Object.fromEntries(board.pieces)).some(p =>
-          p.ownerId === currentPlayer.id
-          && p.type === GAME_PIECE_TYPE.QUEEN
-          && p.state === PIECE_STATE.PLAYER)
-      )
+      this.state === PIECE_STATE.BOARD &&
+      (board.brokeBoard(this) ||
+        Object.values(Object.fromEntries(board.pieces)).some(
+          (p) =>
+            p.ownerId === currentPlayer.id &&
+            p.type === GAME_PIECE_TYPE.QUEEN &&
+            p.state === PIECE_STATE.PLAYER
+        ))
     ) {
       this.possibleMoves = [];
       return this.possibleMoves;
@@ -407,69 +514,81 @@ export class GamePiece {
     let possibleMoves: HexDirection[] = [];
 
     if (this.state === PIECE_STATE.PLAYER) {
-      const pieces = Array.from(board.pieces.values()).filter(p =>
-        p.ownerId === this.ownerId
-        && p.state === PIECE_STATE.BOARD
-        && p.id !== this.id
-      )
-      hexDirections.forEach(dir => {
-        pieces.forEach(p => {
+      const pieces = Array.from(board.pieces.values()).filter(
+        (p) =>
+          p.ownerId === this.ownerId &&
+          p.state === PIECE_STATE.BOARD &&
+          p.id !== this.id
+      );
+      hexDirections.forEach((dir) => {
+        pieces.forEach((p) => {
           const d: HexDirection = {
             q: p.pos.q + dir.q,
             r: p.pos.r + dir.r,
-            z: 1
-          }
+            z: 1,
+          };
           if (!board.pieces.has(hashPosToKey(d))) {
-            if (!board.getNeighbors(d)?.some(n => n.ownerId !== this.ownerId))
-              if (!possibleMoves.find(pm => pm.q === d.q && pm.r === d.r))
+            if (!board.getNeighbors(d)?.some((n) => n.ownerId !== this.ownerId))
+              if (!possibleMoves.find((pm) => pm.q === d.q && pm.r === d.r))
                 possibleMoves.push(d);
           }
-        })
-      })
+        });
+      });
       this.possibleMoves = possibleMoves;
       return this.possibleMoves;
     }
 
     const possiblePositions = new Map<string, HexDirection>();
-    Array.from(board.pieces.values()).forEach(p => {
-      hexDirections.forEach(dir => {
+    Array.from(board.pieces.values()).forEach((p) => {
+      hexDirections.forEach((dir) => {
         const pos: HexDirection = {
           q: p.pos.q + dir.q,
           r: p.pos.r + dir.r,
-          z: 1
-        }
-        possiblePositions.set(hashPosToKey(pos), pos)
-      })
-    })
+          z: 1,
+        };
+        possiblePositions.set(hashPosToKey(pos), pos);
+      });
+    });
 
-    Array.from(possiblePositions.values()).some(dir => {
-      const valid = this.validMovement(board, this, dir)
-      if (valid && !possibleMoves.find(pm => pm.q === dir.q && pm.r === dir.r)) {
+    Array.from(possiblePositions.values()).some((dir) => {
+      const valid = this.validMovement(board, this, dir);
+      if (
+        valid &&
+        !possibleMoves.find((pm) => pm.q === dir.q && pm.r === dir.r)
+      ) {
         if (this.type === GAME_PIECE_TYPE.BEETLE) {
           while (board.pieces.has(hashPosToKey(dir))) dir.z++;
         }
         possibleMoves.push(dir);
       }
-    })
+    });
     this.possibleMoves = possibleMoves;
     return this.possibleMoves;
   }
-
 
   static dragBack(piece: GamePiece, x: number, y: number) {
     piece.draggable.isMoving = true;
     const timer = 20;
     const interval = setInterval(() => {
-      const xV = (Math.abs(piece.draggable.offSet.x) - Math.abs(x)) / (timer);
-      const yV = (Math.abs(piece.draggable.offSet.y) - Math.abs(y)) / (timer);
-      piece.draggable.offSet.x = piece.draggable.offSet.x > 0 ? piece.draggable.offSet.x - xV : piece.draggable.offSet.x + xV;
-      piece.draggable.offSet.y = piece.draggable.offSet.y > 0 ? piece.draggable.offSet.y - yV : piece.draggable.offSet.y + yV;
-      if (Math.abs(piece.draggable.offSet.x - x) < 10 && Math.abs(piece.draggable.offSet.y - y) < 10) {
+      const xV = (Math.abs(piece.draggable.offSet.x) - Math.abs(x)) / timer;
+      const yV = (Math.abs(piece.draggable.offSet.y) - Math.abs(y)) / timer;
+      piece.draggable.offSet.x =
+        piece.draggable.offSet.x > 0
+          ? piece.draggable.offSet.x - xV
+          : piece.draggable.offSet.x + xV;
+      piece.draggable.offSet.y =
+        piece.draggable.offSet.y > 0
+          ? piece.draggable.offSet.y - yV
+          : piece.draggable.offSet.y + yV;
+      if (
+        Math.abs(piece.draggable.offSet.x - x) < 10 &&
+        Math.abs(piece.draggable.offSet.y - y) < 10
+      ) {
         clearInterval(interval);
         piece.draggable.offSet = { x: 0, y: 0 };
         piece.draggable.isMoving = false;
       }
-    }, timer / 1000)
+    }, timer / 1000);
   }
 }
 
@@ -479,13 +598,13 @@ export enum PLAYER_TYPE {
 }
 
 export interface GamePlayerConstructor {
-  id?: string,
-  username: string,
-  type: PLAYER_TYPE,
-  firstMove?: boolean,
-  moveCount?: number,
-  canMove?: boolean,
-  time: number,
+  id?: string;
+  username: string;
+  type: PLAYER_TYPE;
+  firstMove?: boolean;
+  moveCount?: number;
+  canMove?: boolean;
+  time: number;
 }
 
 export class GamePlayer {
@@ -519,7 +638,7 @@ export function pretifyGameMode(gameMode: GAME_MODE) {
     local: "Player vs Player (LOCAL)",
     cpu: "PLAYER vs MACHINE",
     online: "Player vs Player (ONLINE)",
-  }
+  };
   return pretify[gameMode];
 }
 
@@ -536,7 +655,7 @@ export function pretifyGameDifficulty(gameDifficulty: GAME_DIFFICULTY) {
     normal: "Normal",
     hard: "Hard",
     expert: "Expert",
-  }
+  };
   return pretify[gameDifficulty];
 }
 
@@ -555,24 +674,24 @@ export function pretifyGameState(gameState: GAME_STATE) {
     finished: "GAME FINISHED",
     playing: "...PLAYING...",
     calculating: "...CALCULATING...",
-  }
+  };
   return pretify[gameState];
 }
 
 export interface BoardConstructor {
-  id?: string,
-  pieces?: Map<string, GamePiece>,
-  mode: GAME_MODE,
-  p1: GamePlayer,
-  p2: GamePlayer,
-  difficulty: GAME_DIFFICULTY,
-  state?: GAME_STATE,
-  currentPlayer?: string,
-  playerTimer?: number,
-  timerConfig: GAME_TIMER
+  id?: string;
+  pieces?: Map<string, GamePiece>;
+  mode: GAME_MODE;
+  p1: GamePlayer;
+  p2: GamePlayer;
+  difficulty: GAME_DIFFICULTY;
+  state?: GAME_STATE;
+  currentPlayer?: string;
+  playerTimer?: number;
+  timerConfig: GAME_TIMER;
 }
 
-type pos = { x: number, y: number };
+type pos = { x: number; y: number };
 
 export enum GAME_TIMER {
   BULLET = "bullet",
@@ -581,61 +700,60 @@ export enum GAME_TIMER {
 }
 
 interface GAME_TIMER_STATS {
-  timer: number,
-  title: string,
-  pretify: string,
+  timer: number;
+  title: string;
+  pretify: string;
 }
 
 export const gameTimerStats: Record<GAME_TIMER, GAME_TIMER_STATS> = {
   bullet: {
     timer: 60 * 2,
     title: "Bullet",
-    pretify: "2 minutes"
+    pretify: "2 minutes",
   },
   speed: {
     timer: 60 * 5,
     title: "Speed",
-    pretify: "5 minutes"
+    pretify: "5 minutes",
   },
   classic: {
     timer: 60 * 10,
     title: "Classic",
-    pretify: "10 minutes"
-  }
-}
+    pretify: "10 minutes",
+  },
+};
 
 export type GameHookState = {
-  state: GAME_STATE,
-  difficulty: GAME_DIFFICULTY,
-  currentPlayer: GamePlayer,
-  playerTimer: number,
-}
+  state: GAME_STATE;
+  difficulty: GAME_DIFFICULTY;
+  currentPlayer: GamePlayer;
+  playerTimer: number;
+};
 
 export type GameHook = (args: GameHookState) => void;
 
 type GameTree = {
-  value: string //GameState map id
-  player: string
-  active: boolean
-  children?: GameTree[]
+  value: string; //GameState map id
+  player: string;
+  active: boolean;
+  children?: GameTree[];
   p1: {
-    firstMove: boolean
-  }
+    firstMove: boolean;
+  };
   p2: {
-    firstMove: boolean
-  }
-}
+    firstMove: boolean;
+  };
+};
 
 type MinimaxGameTree = GameTree & {
-  heuristicValue: number
-  children?: MinimaxGameTree[]
-}
+  heuristicValue: number;
+  children?: MinimaxGameTree[];
+};
 
 type AlfaBetaGameTree = GameTree & {
-  children?: AlfaBetaGameTree[]
-  alphaBeta: number[]
-}
-
+  children?: AlfaBetaGameTree[];
+  alphaBeta: number[];
+};
 
 export class Board {
   public id: string;
@@ -648,13 +766,19 @@ export class Board {
   public mode: GAME_MODE;
   private hooks: GameHook[] = [];
   private winner: string = "";
-  public timerRef: React.MutableRefObject<ReturnType<typeof setTimeout> | null> = { current: null };
+  public timerRef: React.MutableRefObject<ReturnType<
+    typeof setTimeout
+  > | null> = { current: null };
   public currentCanva: HTMLCanvasElement | null = null;
   public HEX_SIZE: number = 30;
   public HEX_WIDTH: number = Math.sqrt(3) * this.HEX_SIZE;
   public HEX_HEIGHT: number = 2 * this.HEX_SIZE;
   public currentPlayer: string;
-  public mousePos: pos & { state: PIECE_STATE } = { x: 0, y: 0, state: PIECE_STATE.BOARD };
+  public mousePos: pos & { state: PIECE_STATE } = {
+    x: 0,
+    y: 0,
+    state: PIECE_STATE.BOARD,
+  };
   public divisoryBoard: number = 8 * 30;
   public timerConfig: GAME_TIMER;
   private heuristicPlayer: string | undefined = undefined;
@@ -671,12 +795,12 @@ export class Board {
     beetle: null,
     grasshopper: null,
     queen: null,
-    spider: null
+    spider: null,
   };
 
   static async preloadImages() {
     await Promise.all(
-      Object.values(GAME_PIECE_TYPE).map(type => {
+      Object.values(GAME_PIECE_TYPE).map((type) => {
         return new Promise<void>((resolve) => {
           const img = new Image();
           const IconComponent = PIECE_TYPE_IMAGES[type];
@@ -692,7 +816,7 @@ export class Board {
               React.createElement(IconComponent)
             );
 
-            const svgBlob = new Blob([svgString], { type: 'image/svg+xml' });
+            const svgBlob = new Blob([svgString], { type: "image/svg+xml" });
             const url = URL.createObjectURL(svgBlob);
 
             img.onload = () => {
@@ -731,20 +855,23 @@ export class Board {
     this.timerConfig = args.timerConfig;
     this.playerTimer = gameTimerStats[args.timerConfig].timer;
 
-    this.p1.time = this.p1.time > gameTimerStats[this.timerConfig].timer
-      ? gameTimerStats[this.timerConfig].timer
-      : this.p1.time;
+    this.p1.time =
+      this.p1.time > gameTimerStats[this.timerConfig].timer
+        ? gameTimerStats[this.timerConfig].timer
+        : this.p1.time;
 
-    this.p2.time = this.p2.time > gameTimerStats[this.timerConfig].timer
-      ? gameTimerStats[this.timerConfig].timer
-      : this.p2.time;
+    this.p2.time =
+      this.p2.time > gameTimerStats[this.timerConfig].timer
+        ? gameTimerStats[this.timerConfig].timer
+        : this.p2.time;
 
     this.pieces = new Map<string, GamePiece>();
 
     if (args.pieces) {
-      const piecesData: [string, GamePieceConstructor & { draggable: Drag }][] = args.pieces instanceof Map ?
-        Array.from(args.pieces.entries()) :
-        Object.entries(args.pieces);
+      const piecesData: [string, GamePieceConstructor & { draggable: Drag }][] =
+        args.pieces instanceof Map
+          ? Array.from(args.pieces.entries())
+          : Object.entries(args.pieces);
 
       piecesData.forEach(([key, pieceData]) => {
         const piece = new GamePiece({
@@ -752,7 +879,7 @@ export class Board {
           type: pieceData.type,
           ownerId: pieceData.ownerId,
           state: pieceData.state,
-          info: pieceData.info
+          info: pieceData.info,
         });
         piece.draggable = pieceData.draggable;
         this.pieces.set(key, piece);
@@ -770,14 +897,15 @@ export class Board {
     //this.updateHooks()
   }
 
-  static async minMax(
-    board: Board,
-    depth: number = 5
-  ): Promise<Board> {
+  static async minMax(board: Board, depth: number = 5): Promise<Board> {
     if (board.state === GAME_STATE.CALCULATING) return board;
     let state = { ...board.getLastTree() };
     if (!state) return board;
-    let miniMaxState: MinimaxGameTree = { ...(state as GameTree), heuristicValue: 0, children: [] }
+    let miniMaxState: MinimaxGameTree = {
+      ...(state as GameTree),
+      heuristicValue: 0,
+      children: [],
+    };
     board.setHeuristicPlayer();
     board.calculating();
     const initialChildren = board.genAllPossiblesStates();
@@ -795,25 +923,31 @@ export class Board {
       if (currentDepth === depth) {
         return Board.getBoardHeuristicValue(board);
       }
-      const type: 'min' | 'max' = board.currentPlayer === board.heuristicPlayer ? 'max' : 'min';
-      state.children = board.genAllPossiblesStates().map(newState => (
-        {
-          ...newState,
-          heuristicValue: 0,
-          children: []
-        }
-      ));
+      const type: "min" | "max" =
+        board.currentPlayer === board.heuristicPlayer ? "max" : "min";
+      state.children = board.genAllPossiblesStates().map((newState) => ({
+        ...newState,
+        heuristicValue: 0,
+        children: [],
+      }));
 
       if (state.children.length === 0) {
         // Apenas invertendo o estado pois jogador não possui jogadas válidas.
-        const newPlayer = board.currentPlayer === board.p1.id ? board.p2.id : board.p1.id
+        const newPlayer =
+          board.currentPlayer === board.p1.id ? board.p2.id : board.p1.id;
         const newState = {
           ...state,
-          player: newPlayer
-        }
+          player: newPlayer,
+        };
         board.currentPlayer = state.player;
         board.getPlayer(board.currentPlayer).moveCount++;
-        const value = await minMaxRecursivo(board, newState, currentDepth + 1, depth, visited);
+        const value = await minMaxRecursivo(
+          board,
+          newState,
+          currentDepth + 1,
+          depth,
+          visited
+        );
         board.currentPlayer = state.player;
         board.getPlayer(board.currentPlayer).moveCount--;
         return value;
@@ -823,12 +957,18 @@ export class Board {
         await new Promise(requestAnimationFrame);
         board.currentPlayer = state.player;
         board.getPlayer(board.currentPlayer).moveCount++;
-        const value = await minMaxRecursivo(board, {
-          ...move,
-          heuristicValue: 0
-        }, currentDepth + 1, depth, visited)
+        const value = await minMaxRecursivo(
+          board,
+          {
+            ...move,
+            heuristicValue: 0,
+          },
+          currentDepth + 1,
+          depth,
+          visited
+        );
         if (value != null) {
-          values.push(value)
+          values.push(value);
         }
         board.currentPlayer = state.player;
         board.getPlayer(board.currentPlayer).moveCount--;
@@ -839,49 +979,50 @@ export class Board {
       //   return minMaxRecursivo(board, move, currentDepth + 1, depth, new Set(visited))
       // }))
 
-      const value = type === 'max'
-        ? Math.max(...values) // pegando maior elemento
-        : Math.min(...values) // pegando menor elemento
+      const value =
+        type === "max"
+          ? Math.max(...values) // pegando maior elemento
+          : Math.min(...values); // pegando menor elemento
       state.heuristicValue = value;
       return value;
     }
     let visited = new Set<string>();
     await minMaxRecursivo(board, miniMaxState, 0, depth, visited);
     const newState = miniMaxState.children?.reduce((prev, current) => {
-      return (prev as MinimaxGameTree).heuristicValue >= (current as MinimaxGameTree).heuristicValue
+      return (prev as MinimaxGameTree).heuristicValue >=
+        (current as MinimaxGameTree).heuristicValue
         ? prev
-        : current
+        : current;
     });
     const lastTree = board.getLastTree();
     if (newState && lastTree) {
       lastTree.children = initialChildren;
-      lastTree.children?.forEach(s => {
+      lastTree.children?.forEach((s) => {
         if (s.value === newState.value) {
           s.active = true;
           board.getPlayer(board.currentPlayer).moveCount++;
           board.loadState(s);
           s.children = board.genAllPossiblesStates();
         }
-      })
-    }
-    else
-      board.loadState(state as GameTree);
-    console.dir(board.gameTree, { depth: null })
+      });
+    } else board.loadState(state as GameTree);
+    console.dir(board.gameTree, { depth: null });
     board.uncalculating();
     board.updateHooks();
-    console.log(`Nodes Visited: ${visited.size}`)
-    console.log(`ALL Generated States: ${board.gameStates.size}`)
+    console.log(`Nodes Visited: ${visited.size}`);
+    console.log(`ALL Generated States: ${board.gameStates.size}`);
     return board;
   }
 
-  static async alfaBeta(
-    board: Board,
-    depth: number = 5
-  ): Promise<Board> {
+  static async alfaBeta(board: Board, depth: number = 5): Promise<Board> {
     if (board.state === GAME_STATE.CALCULATING) return board;
     let state = { ...board.getLastTree() };
     if (!state) return board;
-    let alphaBetaState: AlfaBetaGameTree = { ...(state as GameTree), alphaBeta: [-Infinity, +Infinity], children: [] }
+    let alphaBetaState: AlfaBetaGameTree = {
+      ...(state as GameTree),
+      alphaBeta: [-Infinity, +Infinity],
+      children: [],
+    };
     board.setHeuristicPlayer();
     board.calculating();
     const initialChildren = board.genAllPossiblesStates();
@@ -900,87 +1041,110 @@ export class Board {
       if (currentDepth === depth) {
         return Board.getBoardHeuristicValue(board);
       }
-      const type: 'min' | 'max' = board.currentPlayer === board.heuristicPlayer ? 'max' : 'min';
-      state.children = board.genAllPossiblesStates().map(newState => (
-        {
-          ...newState,
-          alphaBeta: [...state.alphaBeta],
-          children: []
-        }
-      ));
+      const type: "min" | "max" =
+        board.currentPlayer === board.heuristicPlayer ? "max" : "min";
+      state.children = board.genAllPossiblesStates().map((newState) => ({
+        ...newState,
+        alphaBeta: [...state.alphaBeta],
+        children: [],
+      }));
 
       if (state.children.length === 0) {
         // Apenas invertendo o estado pois jogador não possui jogadas válidas.
-        const newPlayer = board.currentPlayer === board.p1.id ? board.p2.id : board.p1.id
+        const newPlayer =
+          board.currentPlayer === board.p1.id ? board.p2.id : board.p1.id;
         const newState = {
           ...state,
           alphaBeta: [...state.alphaBeta],
-          player: newPlayer
-        }
+          player: newPlayer,
+        };
         board.getPlayer(state.player).moveCount++;
-        const value = await alfaBetaRecursivo(board, newState, state.alphaBeta, currentDepth + 1, depth, visited);
+        const value = await alfaBetaRecursivo(
+          board,
+          newState,
+          state.alphaBeta,
+          currentDepth + 1,
+          depth,
+          visited
+        );
         board.getPlayer(state.player).moveCount--;
         if (value !== null) {
           switch (type) {
-            case 'min':
-              state.alphaBeta[1] = value < state.alphaBeta[1] ? value : state.alphaBeta[1]
+            case "min":
+              state.alphaBeta[1] =
+                value < state.alphaBeta[1] ? value : state.alphaBeta[1];
               break;
-            case 'max':
-              state.alphaBeta[0] = value > state.alphaBeta[0] ? value : state.alphaBeta[0]
+            case "max":
+              state.alphaBeta[0] =
+                value > state.alphaBeta[0] ? value : state.alphaBeta[0];
               break;
           }
         }
-        state.alphaBeta = state.alphaBeta[0] < state.alphaBeta[1]
-          ? [state.alphaBeta[1], state.alphaBeta[1]]
-          : [state.alphaBeta[0], state.alphaBeta[0]]
-        return type == 'max'
-          ? state.alphaBeta[0]
-          : state.alphaBeta[1];
+        state.alphaBeta =
+          state.alphaBeta[0] < state.alphaBeta[1]
+            ? [state.alphaBeta[1], state.alphaBeta[1]]
+            : [state.alphaBeta[0], state.alphaBeta[0]];
+        return type == "max" ? state.alphaBeta[0] : state.alphaBeta[1];
       }
 
       for (const move of state.children) {
         await new Promise(requestAnimationFrame);
         board.getPlayer(state.player).moveCount++;
-        const value = await alfaBetaRecursivo(board, move, state.alphaBeta, currentDepth + 1, depth, visited);
+        const value = await alfaBetaRecursivo(
+          board,
+          move,
+          state.alphaBeta,
+          currentDepth + 1,
+          depth,
+          visited
+        );
         board.getPlayer(state.player).moveCount--;
         if (value !== null) {
           switch (type) {
-            case 'min':
-              state.alphaBeta[1] = value < state.alphaBeta[1] ? value : state.alphaBeta[1]
+            case "min":
+              state.alphaBeta[1] =
+                value < state.alphaBeta[1] ? value : state.alphaBeta[1];
               break;
-            case 'max':
-              state.alphaBeta[0] = value > state.alphaBeta[0] ? value : state.alphaBeta[0]
+            case "max":
+              state.alphaBeta[0] =
+                value > state.alphaBeta[0] ? value : state.alphaBeta[0];
               break;
           }
           // Checar se com o novo valor de min e max precisa parar
-          if (type === 'min') {
+          if (type === "min") {
             // Minimização // Parente é max
             // Se o valor do beta[1] (atual) for menor que o alfa[0](parente) -> para
             if (state.alphaBeta[1] <= parentAlfaBeta[0]) {
-              console.log("CUTTING")
+              console.log("CUTTING");
               break;
             }
           } else {
             // Maximização // Parente é min
             // Se o valor de alfa[0] (atual) for maior que o de beta[1](parente) -> para
             if (state.alphaBeta[0] >= parentAlfaBeta[1]) {
-              console.log("CUTTING")
+              console.log("CUTTING");
               break;
             }
           }
         }
       }
 
-      state.alphaBeta = state.alphaBeta[0] < state.alphaBeta[1]
-        ? [state.alphaBeta[1], state.alphaBeta[1]]
-        : [state.alphaBeta[0], state.alphaBeta[0]]
+      state.alphaBeta =
+        state.alphaBeta[0] < state.alphaBeta[1]
+          ? [state.alphaBeta[1], state.alphaBeta[1]]
+          : [state.alphaBeta[0], state.alphaBeta[0]];
 
-      return type == 'max'
-        ? state.alphaBeta[0]
-        : state.alphaBeta[1];
+      return type == "max" ? state.alphaBeta[0] : state.alphaBeta[1];
     }
     let visited = new Set<string>();
-    const value = await alfaBetaRecursivo(board, alphaBetaState, [-Infinity, +Infinity], 0, depth, visited);
+    const value = await alfaBetaRecursivo(
+      board,
+      alphaBetaState,
+      [-Infinity, +Infinity],
+      0,
+      depth,
+      visited
+    );
     if (value !== null) {
       alphaBetaState.alphaBeta[0] = value;
       if (alphaBetaState.alphaBeta[1] > alphaBetaState.alphaBeta[0]) {
@@ -989,29 +1153,28 @@ export class Board {
     }
     const newState = alphaBetaState.children?.reduce((prev, current) => {
       // Estamos maximizando, nó raiz, procurar melhor valor de alpha
-      return (prev as AlfaBetaGameTree).alphaBeta[0] >= (current as AlfaBetaGameTree).alphaBeta[0]
+      return (prev as AlfaBetaGameTree).alphaBeta[0] >=
+        (current as AlfaBetaGameTree).alphaBeta[0]
         ? prev
-        : current
+        : current;
     });
     const lastTree = board.getLastTree();
     if (newState && lastTree) {
       lastTree.children = initialChildren;
-      lastTree.children?.forEach(s => {
+      lastTree.children?.forEach((s) => {
         if (s.value === newState.value) {
           s.active = true;
           board.getPlayer(board.currentPlayer).moveCount++;
           board.loadState(s);
           s.children = board.genAllPossiblesStates();
         }
-      })
-    }
-    else
-      board.loadState(state as GameTree);
-    console.dir(board.gameTree, { depth: null })
+      });
+    } else board.loadState(state as GameTree);
+    console.dir(board.gameTree, { depth: null });
     board.uncalculating();
     board.updateHooks();
-    console.log(`Nodes Visited: ${visited.size}`)
-    console.log(`ALL Generated States: ${board.gameStates.size}`)
+    console.log(`Nodes Visited: ${visited.size}`);
+    console.log(`ALL Generated States: ${board.gameStates.size}`);
     return board;
   }
 
@@ -1024,39 +1187,43 @@ export class Board {
     let qtdNeighborsQueenMax: number = 0;
     let qtdMovimentosMin: number = 0;
     let qtdNeighborsQueenMin: number = 0;
-    board.pieces.forEach(p => {
+    board.pieces.forEach((p) => {
       if (p.ownerId == board.heuristicPlayer) {
         const mov = p.getPossibleMoves(board).length;
-        qtdMovimentosMax += p.type === GAME_PIECE_TYPE.ANT && p.state === PIECE_STATE.BOARD ? 2 * mov : mov
-        if (
-          p.state === PIECE_STATE.BOARD
-          && p.type === GAME_PIECE_TYPE.QUEEN
-        )
+        qtdMovimentosMax +=
+          p.type === GAME_PIECE_TYPE.ANT && p.state === PIECE_STATE.BOARD
+            ? 2 * mov
+            : mov;
+        if (p.state === PIECE_STATE.BOARD && p.type === GAME_PIECE_TYPE.QUEEN)
           qtdNeighborsQueenMax = board.getNeighbors({ ...p.pos })?.length || 1;
       } else {
         const mov = p.getPossibleMoves(board).length;
-        qtdMovimentosMin += p.type === GAME_PIECE_TYPE.ANT && p.state === PIECE_STATE.BOARD ? 2 * mov : mov
-        if (
-          p.state === PIECE_STATE.BOARD
-          && p.type === GAME_PIECE_TYPE.QUEEN
-        )
+        qtdMovimentosMin +=
+          p.type === GAME_PIECE_TYPE.ANT && p.state === PIECE_STATE.BOARD
+            ? 2 * mov
+            : mov;
+        if (p.state === PIECE_STATE.BOARD && p.type === GAME_PIECE_TYPE.QUEEN)
           qtdNeighborsQueenMin = board.getNeighbors({ ...p.pos })?.length || 1;
       }
-
-    })
-    return 2 * qtdMovimentosMax - qtdMovimentosMin + 30 * qtdNeighborsQueenMin - qtdNeighborsQueenMax;
+    });
+    return (
+      2 * qtdMovimentosMax -
+      qtdMovimentosMin +
+      30 * qtdNeighborsQueenMin -
+      qtdNeighborsQueenMax
+    );
   }
 
   private genAllPossiblesStates(): GameTree[] {
     let newChildren: GameTree[] = [];
     let clonePieces = new Map(this.pieces);
-    this.pieces.forEach(piece => {
+    this.pieces.forEach((piece) => {
       if (piece.ownerId === this.currentPlayer) {
         const possibleMoves = piece.getPossibleMoves(this);
         if (possibleMoves.length) {
           clonePieces.delete(hashPosToKey(piece.pos));
           let clonedPiece = new GamePiece(piece);
-          possibleMoves.forEach(pm => {
+          possibleMoves.forEach((pm) => {
             clonedPiece.pos = pm;
             clonedPiece.state = PIECE_STATE.BOARD;
             clonePieces.set(hashPosToKey(pm), clonedPiece);
@@ -1064,17 +1231,26 @@ export class Board {
             newChildren.push({
               value: id,
               active: false,
-              player: this.currentPlayer == this.p1.id ? this.p2.id : this.p1.id,
-              p1: { firstMove: this.p1.firstMove ? this.currentPlayer != this.p1.id : this.p1.firstMove },
-              p2: { firstMove: this.p2.firstMove ? this.currentPlayer != this.p2.id : this.p2.firstMove }
+              player:
+                this.currentPlayer == this.p1.id ? this.p2.id : this.p1.id,
+              p1: {
+                firstMove: this.p1.firstMove
+                  ? this.currentPlayer != this.p1.id
+                  : this.p1.firstMove,
+              },
+              p2: {
+                firstMove: this.p2.firstMove
+                  ? this.currentPlayer != this.p2.id
+                  : this.p2.firstMove,
+              },
             });
             clonePieces.delete(hashPosToKey(pm));
-          })
+          });
           clonePieces.set(hashPosToKey(piece.pos), piece);
         }
       }
-    })
-    const mapped = new Map(newChildren.map(p => [p.value, p]));
+    });
+    const mapped = new Map(newChildren.map((p) => [p.value, p]));
     return Array.from(mapped.values());
   }
 
@@ -1092,13 +1268,13 @@ export class Board {
         children,
         player: this.currentPlayer,
         p1: { firstMove: this.p1.firstMove },
-        p2: { firstMove: this.p2.firstMove }
+        p2: { firstMove: this.p2.firstMove },
       };
     } else {
       //Já está inserido na last tree
       const id = this.insertGameState(this.genGameState());
       //Pego o id do estado (algum children já possui esse ID no value)
-      lastTree.children?.forEach(c => {
+      lastTree.children?.forEach((c) => {
         if (c.value == id) {
           c.children = this.genAllPossiblesStates();
           c.active = true;
@@ -1106,23 +1282,23 @@ export class Board {
           c.p2.firstMove = this.p2.firstMove;
           return;
         }
-      })
+      });
       if (lastTree.children && lastTree.children.length === 0) {
         //Player don't have any possible move
         let copy: GameTree = {
-          ...lastTree
+          ...lastTree,
         };
         copy.player = this.currentPlayer;
         copy.children = this.genAllPossiblesStates();
         lastTree.children.push(copy);
       }
     }
-    this.pieces.forEach(p => {
+    this.pieces.forEach((p) => {
       p.possibleMoves = null;
-    })
+    });
     console.dir(this.gameTree, {
-      depth: null
-    })
+      depth: null,
+    });
   }
 
   private insertGameState(newState: GamePieceMinified[]): string {
@@ -1133,7 +1309,7 @@ export class Board {
         id = key;
         return;
       }
-    })
+    });
     if (id === generetedId) {
       this.gameStates.set(generetedId, newState);
     }
@@ -1148,47 +1324,58 @@ export class Board {
       let found = true;
       while (currentGame.children && found) {
         found = false;
-        currentGame.children.forEach(c => {
+        currentGame.children.forEach((c) => {
           if (c.active) {
             currentGame = c;
             found = true;
             return;
           }
-        })
+        });
       }
       return currentGame;
     }
   }
 
   private genGameState(pieces?: Map<string, GamePiece>): GamePieceMinified[] {
-    return Object.values(Object.fromEntries(pieces ? pieces : this.pieces)).map((p: GamePiece) => {
-      const gamePiece: GamePieceMinified = {
-        id: p.id,
-        ownerId: p.ownerId,
-        pos: p.pos,
-        type: p.type,
-        state: p.state
+    return Object.values(Object.fromEntries(pieces ? pieces : this.pieces)).map(
+      (p: GamePiece) => {
+        const gamePiece: GamePieceMinified = {
+          id: p.id,
+          ownerId: p.ownerId,
+          pos: p.pos,
+          type: p.type,
+          state: p.state,
+        };
+        return gamePiece;
       }
-      return gamePiece;
-    })
+    );
   }
 
-  private isEqualState(state: GamePieceMinified[], otherState: GamePieceMinified[]): boolean {
-    return state.every(piece => {
-      return otherState.some(otherPiece => {
+  private isEqualState(
+    state: GamePieceMinified[],
+    otherState: GamePieceMinified[]
+  ): boolean {
+    return state.every((piece) => {
+      return otherState.some((otherPiece) => {
         return (
-          piece.id === otherPiece.id
-          && this.isEqualPosition(piece.pos, otherPiece.pos)
-          && piece.state === otherPiece.state
-        )
-      })
-    })
+          piece.id === otherPiece.id &&
+          this.isEqualPosition(piece.pos, otherPiece.pos) &&
+          piece.state === otherPiece.state
+        );
+      });
+    });
   }
 
-  private isEqualPosition(pos: HexDirection, otherPos: HexDirection, withZ: boolean = true): boolean {
-    return pos.q === otherPos.q
-      && pos.r === otherPos.r
-      && (withZ ? pos.z === otherPos.z : true)
+  private isEqualPosition(
+    pos: HexDirection,
+    otherPos: HexDirection,
+    withZ: boolean = true
+  ): boolean {
+    return (
+      pos.q === otherPos.q &&
+      pos.r === otherPos.r &&
+      (withZ ? pos.z === otherPos.z : true)
+    );
   }
 
   backState() {
@@ -1196,7 +1383,7 @@ export class Board {
       toast.info("To crtl+z you must be playing a match!");
       return;
     }
-    const loadedPieces = this.loadLastState()
+    const loadedPieces = this.loadLastState();
     if (loadedPieces) {
       let lastTree = this.getLastTree();
       if (lastTree) lastTree.active = false;
@@ -1216,8 +1403,8 @@ export class Board {
       toast.warning("Can't return more state, alreay at the begning");
     }
     console.dir(this.gameTree, {
-      depth: null
-    })
+      depth: null,
+    });
     this.updateHooks();
   }
 
@@ -1225,29 +1412,31 @@ export class Board {
     const map = new Map<string, GamePiece>();
     const pieces = this.gameStates.get(gameTree.value);
     if (pieces) {
-      pieces.forEach(p => {
+      pieces.forEach((p) => {
         map.set(hashPosToKey(p.pos), new GamePiece(p));
-      })
+      });
     }
 
     return map;
   }
 
-  private loadLastState(): GameTree & { pieces: Map<string, GamePiece> } | undefined {
+  private loadLastState():
+    | (GameTree & { pieces: Map<string, GamePiece> })
+    | undefined {
     if (this.gameTree) {
       let current = this.gameTree;
       let prev: GameTree | undefined = undefined;
       let found = true;
       while (current.children && found) {
         found = false;
-        current.children.forEach(c => {
+        current.children.forEach((c) => {
           if (c.active) {
             found = true;
             prev = current;
             current = c;
             return;
           }
-        })
+        });
       }
       if (prev !== undefined) {
         const pieces = this.gameTreeToPieces(prev);
@@ -1259,14 +1448,16 @@ export class Board {
         const pieces = this.gameTreeToPieces(current);
         return {
           ...current,
-          pieces
+          pieces,
         };
       }
     }
     return undefined;
   }
 
-  addTimerRef(timerRef: React.MutableRefObject<ReturnType<typeof setTimeout> | null>) {
+  addTimerRef(
+    timerRef: React.MutableRefObject<ReturnType<typeof setTimeout> | null>
+  ) {
     this.timerRef = timerRef;
   }
 
@@ -1297,7 +1488,6 @@ export class Board {
   }
 
   initBoard() {
-
     this.pieces.clear();
 
     const piecesP1 = [
@@ -1308,7 +1498,7 @@ export class Board {
           z: 1,
         },
         ownerId: this.p1.id,
-        type: GAME_PIECE_TYPE.QUEEN
+        type: GAME_PIECE_TYPE.QUEEN,
       },
       {
         pos: {
@@ -1317,7 +1507,7 @@ export class Board {
           z: 1,
         },
         ownerId: this.p1.id,
-        type: GAME_PIECE_TYPE.SPIDER
+        type: GAME_PIECE_TYPE.SPIDER,
       },
       {
         pos: {
@@ -1326,7 +1516,7 @@ export class Board {
           z: 1,
         },
         ownerId: this.p1.id,
-        type: GAME_PIECE_TYPE.SPIDER
+        type: GAME_PIECE_TYPE.SPIDER,
       },
       {
         pos: {
@@ -1335,7 +1525,7 @@ export class Board {
           z: 1,
         },
         ownerId: this.p1.id,
-        type: GAME_PIECE_TYPE.BEETLE
+        type: GAME_PIECE_TYPE.BEETLE,
       },
       {
         pos: {
@@ -1344,7 +1534,7 @@ export class Board {
           z: 1,
         },
         ownerId: this.p1.id,
-        type: GAME_PIECE_TYPE.BEETLE
+        type: GAME_PIECE_TYPE.BEETLE,
       },
       {
         pos: {
@@ -1353,7 +1543,7 @@ export class Board {
           z: 1,
         },
         ownerId: this.p1.id,
-        type: GAME_PIECE_TYPE.ANT
+        type: GAME_PIECE_TYPE.ANT,
       },
       {
         pos: {
@@ -1362,7 +1552,7 @@ export class Board {
           z: 1,
         },
         ownerId: this.p1.id,
-        type: GAME_PIECE_TYPE.ANT
+        type: GAME_PIECE_TYPE.ANT,
       },
       {
         pos: {
@@ -1371,7 +1561,7 @@ export class Board {
           z: 1,
         },
         ownerId: this.p1.id,
-        type: GAME_PIECE_TYPE.ANT
+        type: GAME_PIECE_TYPE.ANT,
       },
       {
         pos: {
@@ -1380,7 +1570,7 @@ export class Board {
           z: 1,
         },
         ownerId: this.p1.id,
-        type: GAME_PIECE_TYPE.GRASSHOPPER
+        type: GAME_PIECE_TYPE.GRASSHOPPER,
       },
       {
         pos: {
@@ -1389,7 +1579,7 @@ export class Board {
           z: 1,
         },
         ownerId: this.p1.id,
-        type: GAME_PIECE_TYPE.GRASSHOPPER
+        type: GAME_PIECE_TYPE.GRASSHOPPER,
       },
       {
         pos: {
@@ -1398,9 +1588,9 @@ export class Board {
           z: 1,
         },
         ownerId: this.p1.id,
-        type: GAME_PIECE_TYPE.GRASSHOPPER
+        type: GAME_PIECE_TYPE.GRASSHOPPER,
       },
-    ]
+    ];
 
     const piecesP2 = [
       {
@@ -1410,7 +1600,7 @@ export class Board {
           z: 1,
         },
         ownerId: this.p2.id,
-        type: GAME_PIECE_TYPE.QUEEN
+        type: GAME_PIECE_TYPE.QUEEN,
       },
       {
         pos: {
@@ -1419,7 +1609,7 @@ export class Board {
           z: 1,
         },
         ownerId: this.p2.id,
-        type: GAME_PIECE_TYPE.SPIDER
+        type: GAME_PIECE_TYPE.SPIDER,
       },
       {
         pos: {
@@ -1428,7 +1618,7 @@ export class Board {
           z: 1,
         },
         ownerId: this.p2.id,
-        type: GAME_PIECE_TYPE.SPIDER
+        type: GAME_PIECE_TYPE.SPIDER,
       },
       {
         pos: {
@@ -1437,7 +1627,7 @@ export class Board {
           z: 1,
         },
         ownerId: this.p2.id,
-        type: GAME_PIECE_TYPE.BEETLE
+        type: GAME_PIECE_TYPE.BEETLE,
       },
       {
         pos: {
@@ -1446,7 +1636,7 @@ export class Board {
           z: 1,
         },
         ownerId: this.p2.id,
-        type: GAME_PIECE_TYPE.BEETLE
+        type: GAME_PIECE_TYPE.BEETLE,
       },
       {
         pos: {
@@ -1455,7 +1645,7 @@ export class Board {
           z: 1,
         },
         ownerId: this.p2.id,
-        type: GAME_PIECE_TYPE.ANT
+        type: GAME_PIECE_TYPE.ANT,
       },
       {
         pos: {
@@ -1464,7 +1654,7 @@ export class Board {
           z: 1,
         },
         ownerId: this.p2.id,
-        type: GAME_PIECE_TYPE.ANT
+        type: GAME_PIECE_TYPE.ANT,
       },
       {
         pos: {
@@ -1473,7 +1663,7 @@ export class Board {
           z: 1,
         },
         ownerId: this.p2.id,
-        type: GAME_PIECE_TYPE.ANT
+        type: GAME_PIECE_TYPE.ANT,
       },
       {
         pos: {
@@ -1482,7 +1672,7 @@ export class Board {
           z: 1,
         },
         ownerId: this.p2.id,
-        type: GAME_PIECE_TYPE.GRASSHOPPER
+        type: GAME_PIECE_TYPE.GRASSHOPPER,
       },
       {
         pos: {
@@ -1491,7 +1681,7 @@ export class Board {
           z: 1,
         },
         ownerId: this.p2.id,
-        type: GAME_PIECE_TYPE.GRASSHOPPER
+        type: GAME_PIECE_TYPE.GRASSHOPPER,
       },
       {
         pos: {
@@ -1500,9 +1690,9 @@ export class Board {
           z: 1,
         },
         ownerId: this.p2.id,
-        type: GAME_PIECE_TYPE.GRASSHOPPER
+        type: GAME_PIECE_TYPE.GRASSHOPPER,
       },
-    ]
+    ];
 
     this.placePieces([...piecesP1, ...piecesP2]);
     this.currentPlayer = this.p1.id;
@@ -1538,14 +1728,14 @@ export class Board {
 
   calculating() {
     if (this.state === GAME_STATE.PLAYING) {
-      this.state = GAME_STATE.CALCULATING
+      this.state = GAME_STATE.CALCULATING;
       this.updateHooks();
     }
   }
 
   uncalculating() {
     if (this.state === GAME_STATE.CALCULATING) {
-      this.state = GAME_STATE.PLAYING
+      this.state = GAME_STATE.PLAYING;
       this.updateHooks();
     }
   }
@@ -1555,21 +1745,21 @@ export class Board {
     this.p2.time = gameTimerStats[this.timerConfig].timer;
     this.offSet = {
       x: 0,
-      y: 0
-    }
+      y: 0,
+    };
     this.start();
     this.updateHooks();
   }
 
   updateHooks() {
-    this.hooks.forEach(hook => {
+    this.hooks.forEach((hook) => {
       hook({
         currentPlayer: this.getPlayer(this.currentPlayer),
         difficulty: this.difficulty,
         state: this.state,
-        playerTimer: this.playerTimer
+        playerTimer: this.playerTimer,
       } as GameHookState);
-    })
+    });
   }
 
   getPlayer(id: string): GamePlayer {
@@ -1582,9 +1772,14 @@ export class Board {
       if (pieceToInsert.type === GAME_PIECE_TYPE.BEETLE) {
         pieceToInsert.pos.z++;
         pieceToInsert.id = GamePiece.hashPosToKey(pieceToInsert.pos);
-        if (this.pieces.has(pieceToInsert.id)) throw new Error(`Não foi possível inserir a peça ${pieceToInsert.type}!`)
+        if (this.pieces.has(pieceToInsert.id))
+          throw new Error(
+            `Não foi possível inserir a peça ${pieceToInsert.type}!`
+          );
       } else {
-        throw new Error(`Não foi possível inserir a peça ${pieceToInsert.type}!`)
+        throw new Error(
+          `Não foi possível inserir a peça ${pieceToInsert.type}!`
+        );
       }
     }
   }
@@ -1592,11 +1787,12 @@ export class Board {
   brokeBoard(piece: GamePiece): boolean {
     const piecesClone = new Map(this.pieces);
     piecesClone.delete(GamePiece.hashPosToKey(piece.pos));
-    const pieces = Array.from(piecesClone.entries()).filter(([_key, p]) =>
-      p.state === PIECE_STATE.BOARD
-      && !piecesClone.has(GamePiece.hashPosToKey({ ...p.pos, z: p.pos.z + 1 }))
+    const pieces = Array.from(piecesClone.entries()).filter(
+      ([_key, p]) =>
+        p.state === PIECE_STATE.BOARD &&
+        !piecesClone.has(GamePiece.hashPosToKey({ ...p.pos, z: p.pos.z + 1 }))
     );
-    const piecesFound = [...pieces.map(p => p[1].pos)];
+    const piecesFound = [...pieces.map((p) => p[1].pos)];
     if (piecesFound.length === 0) return false;
     const freq = new Map();
     const queue = [];
@@ -1607,98 +1803,106 @@ export class Board {
         freq.set(GamePiece.hashPosToKey(current), true);
         const neighbors = this.getNeighbors(current);
         if (neighbors) {
-            queue.push(...(neighbors?.filter(p => 
-              p?.pos 
-              && !freq.get(GamePiece.hashPosToKey(p.pos)) 
-              && !this.isEqualPosition(p.pos, piece.pos)
-          ).map(p => p?.pos)));
+          queue.push(
+            ...neighbors
+              ?.filter(
+                (p) =>
+                  p?.pos &&
+                  !freq.get(GamePiece.hashPosToKey(p.pos)) &&
+                  !this.isEqualPosition(p.pos, piece.pos)
+              )
+              .map((p) => p?.pos)
+          );
         }
       }
     }
     return freq.size !== piecesFound.length;
   }
 
-  canSlide(from: HexDirection, to: HexDirection, type: GAME_PIECE_TYPE, self?: string): boolean {
+  canSlide(
+    from: HexDirection,
+    to: HexDirection,
+    type: GAME_PIECE_TYPE,
+    self?: string
+  ): boolean {
     if (type === GAME_PIECE_TYPE.GRASSHOPPER) {
       return true;
     } else {
       return Object.entries(hexDirectionsCardinal).some(([key, dir]) => {
-        if (to.q !== from.q + dir.q
-          || to.r !== from.r + dir.r
-        ) return false;
+        if (to.q !== from.q + dir.q || to.r !== from.r + dir.r) return false;
         const path: HexDirection[] = [];
         switch (key) {
           case "LESTE":
             path.push({
               q: from.q + hexDirectionsCardinal["NORDESTE"].q,
               r: from.r + hexDirectionsCardinal["NORDESTE"].r,
-              z: 1
-            })
+              z: 1,
+            });
             path.push({
               q: from.q + hexDirectionsCardinal["SUDESTE"].q,
               r: from.r + hexDirectionsCardinal["SUDESTE"].r,
-              z: 1
-            })
+              z: 1,
+            });
             break;
           case "NORDESTE":
             path.push({
               q: from.q + hexDirectionsCardinal["NOROESTE"].q,
               r: from.r + hexDirectionsCardinal["NOROESTE"].r,
-              z: 1
-            })
+              z: 1,
+            });
             path.push({
               q: from.q + hexDirectionsCardinal["LESTE"].q,
               r: from.r + hexDirectionsCardinal["LESTE"].r,
-              z: 1
-            })
+              z: 1,
+            });
             break;
           case "NOROESTE":
             path.push({
               q: from.q + hexDirectionsCardinal["OESTE"].q,
               r: from.r + hexDirectionsCardinal["OESTE"].r,
-              z: 1
-            })
+              z: 1,
+            });
             path.push({
               q: from.q + hexDirectionsCardinal["NORDESTE"].q,
               r: from.r + hexDirectionsCardinal["NORDESTE"].r,
-              z: 1
-            })
+              z: 1,
+            });
             break;
           case "OESTE":
             path.push({
               q: from.q + hexDirectionsCardinal["NOROESTE"].q,
               r: from.r + hexDirectionsCardinal["NOROESTE"].r,
-              z: 1
-            })
+              z: 1,
+            });
             path.push({
               q: from.q + hexDirectionsCardinal["SUDOESTE"].q,
               r: from.r + hexDirectionsCardinal["SUDOESTE"].r,
-              z: 1
-            })
+              z: 1,
+            });
             break;
           case "SUDOESTE":
             path.push({
               q: from.q + hexDirectionsCardinal["OESTE"].q,
               r: from.r + hexDirectionsCardinal["OESTE"].r,
-              z: 1
-            })
+              z: 1,
+            });
             path.push({
               q: from.q + hexDirectionsCardinal["SUDESTE"].q,
               r: from.r + hexDirectionsCardinal["SUDESTE"].r,
-              z: 1
-            })
+              z: 1,
+            });
             break;
           case "SUDESTE":
             path.push({
               q: from.q + hexDirectionsCardinal["SUDOESTE"].q,
               r: from.r + hexDirectionsCardinal["SUDOESTE"].r,
-              z: 1
-            })
+              z: 1,
+            });
             path.push({
               q: from.q + hexDirectionsCardinal["LESTE"].q,
               r: from.r + hexDirectionsCardinal["LESTE"].r,
-              z: 1
-            })
+              z: 1,
+            });
             break;
           default:
             return false;
@@ -1707,18 +1911,27 @@ export class Board {
           const keys: (GamePiece | undefined)[] = [
             this.pieces.get(hashPosToKey(path[0])),
             this.pieces.get(hashPosToKey(path[1])),
-          ]
-          return keys.some(p => p?.id === self) || this.pieces.has(hashPosToKey(path[0])) !== this.pieces.has(hashPosToKey(path[1]))
+          ];
+          return (
+            keys.some((p) => p?.id === self) ||
+            this.pieces.has(hashPosToKey(path[0])) !==
+              this.pieces.has(hashPosToKey(path[1]))
+          );
         } else {
-          return this.pieces.has(hashPosToKey(path[0])) !== this.pieces.has(hashPosToKey(path[1])) // XOR comparission
+          return (
+            this.pieces.has(hashPosToKey(path[0])) !==
+            this.pieces.has(hashPosToKey(path[1]))
+          ); // XOR comparission
         }
-      })
+      });
     }
   }
 
   dropPiece(piece: GamePiece, to: HexDirection): GamePiece {
     const validMoves = piece.getPossibleMoves(this);
-    const moveHex = validMoves.find(move => this.isEqualPosition(move, to, false));
+    const moveHex = validMoves.find((move) =>
+      this.isEqualPosition(move, to, false)
+    );
     if (moveHex) {
       this.pieces.delete(GamePiece.hashPosToKey(piece.pos));
       //VALID MOVE
@@ -1729,157 +1942,66 @@ export class Board {
       let player = this.getPlayer(this.currentPlayer);
       player.firstMove = false;
       player.moveCount++;
-      this.pieces.forEach(p => p.possibleMoves = null);
+      this.pieces.forEach((p) => (p.possibleMoves = null));
       this.changePlayer();
       return piece;
     } else {
-      this.pieces.forEach(p => p.possibleMoves = null);
+      this.pieces.forEach((p) => (p.possibleMoves = null));
       toast.error("Unabble to move");
       return piece;
     }
-    if (piece.pos.q === to.q && piece.pos.r === to.r) { // Se a peça está na posição de destino
-      toast.error("Already in the destination!");
-      return piece;
-    };
-    const neighbors = this.getNeighbors(to);
-    const coordPos = this.cubeToPixel(piece.pos, piece.state);
-    if (piece.state === PIECE_STATE.BOARD) {
-      // Moving piece board to board
-      if (Array.from(this.pieces.values()).filter(p =>
-        p.state === PIECE_STATE.BOARD
-        && p.ownerId === this.currentPlayer
-        && p.type === GAME_PIECE_TYPE.QUEEN
-      ).length === 0) { // Não posicionou a rainha
-        toast.error("The Queen must be positioned to move an piece on the board!");
-        GamePiece.dragBack(piece, coordPos.x, coordPos.y);
-        return piece;
-      }
-      if (
-        (!this.pieces.has(hashPosToKey(to)) || piece.type === GAME_PIECE_TYPE.BEETLE) // Não tem peça no destino ou é um besouro
-        && !this.pieces.has(GamePiece.hashPosToKey({ ...piece.pos, z: piece.pos.z + 1 })) // Não tem peça na posição acima de onde a peça está
-        && piece.validMovement(this, piece, to) // Movimento válido da peça
-      ) {
-        if (this.brokeBoard(piece)) {
-          GamePiece.dragBack(piece, coordPos.x, coordPos.y);
-          toast.error("The Hive has been broken!");
-          return piece;
-        }
-        this.pieces.delete(GamePiece.hashPosToKey(piece.pos));
-        //VALID MOVE
-        piece.draggable.offSet = { x: 0, y: 0 };
-        piece.pos = { ...to, z: piece.pos.z };
-        if (
-          piece.type === GAME_PIECE_TYPE.BEETLE
-        ) {
-          piece.pos.z = 1;
-          while (this.pieces.has(GamePiece.hashPosToKey({ ...to, z: piece.pos.z })))
-            piece.pos.z++;
-        }
-        this.pieces.set(GamePiece.hashPosToKey(piece.pos), piece);
-        this.changePlayer();
-        return piece;
-      } else {
-        toast.info(piece.info.movement);
-      }
-    } else {
-      //Moving piece from player to board
-      if (this.getPlayer(this.currentPlayer).firstMove === true) {
-        const position = this.cubeToPixel(to);
-        if (
-          Array.from(this.pieces.values()).filter(p => p.state === PIECE_STATE.BOARD).length === 0
-          && this.isOnBoard(position.x, position.y)
-        ) {
-          this.getPlayer(this.currentPlayer).firstMove = false;
-          this.pieces.delete(GamePiece.hashPosToKey(piece.pos));
-          piece.state = PIECE_STATE.BOARD;
-          piece.pos = { q: 0, r: 0, z: 1 };
-          this.pieces.set(GamePiece.hashPosToKey(piece.pos), piece);
-          this.changePlayer();
-          return piece;
-        } else if (this.getNeighbors(to)?.filter(p => p?.state === PIECE_STATE.BOARD && p?.id !== piece.id).length === 1) {
-          this.getPlayer(this.currentPlayer).firstMove = false;
-          this.pieces.delete(GamePiece.hashPosToKey(piece.pos));
-          piece.state = PIECE_STATE.BOARD;
-          piece.pos = to;
-          this.pieces.set(GamePiece.hashPosToKey(piece.pos), piece);
-          this.changePlayer();
-          return piece;
-        }
-      } else if (
-        neighbors
-        && !neighbors.some(p => p?.state === PIECE_STATE.BOARD && p?.ownerId !== this.currentPlayer) // Não tem peças adversárias
-        && neighbors.some(p => p?.ownerId === this.currentPlayer && p?.state === PIECE_STATE.BOARD) // Tem peças do player  
-        && !this.pieces.has(GamePiece.hashPosToKey(to)) // Local vazio
-      ) {
-        // Se já tiver feito 3 movimentos, é obrigatório inserir a rainha
-        if (
-          this.getPlayer(this.currentPlayer).moveCount === 3
-          && piece.type !== GAME_PIECE_TYPE.QUEEN
-          && !Array.from(this.pieces.values()).some(p =>
-            p.state === PIECE_STATE.BOARD
-            && p.ownerId === this.currentPlayer
-            && p.type === GAME_PIECE_TYPE.QUEEN)
-        ) {
-          toast.error("You must insert the Queen!");
-          GamePiece.dragBack(piece, coordPos.x, coordPos.y);
-          return piece;
-        }
-        this.pieces.delete(GamePiece.hashPosToKey(piece.pos));
-        piece.state = PIECE_STATE.BOARD;
-        piece.pos = to;
-        piece.draggable.offSet = { x: 0, y: 0 };
-        //VALID MOVE
-        this.pieces.set(GamePiece.hashPosToKey(piece.pos), piece);
-        this.changePlayer();
-        return piece;
-
-      }
-    }
-    toast.error("Can't move the piece!");
-    GamePiece.dragBack(piece, coordPos.x, coordPos.y);
-    return piece;
   }
 
   calcPlayerCanMove(): boolean {
     if (this.getPlayer(this.currentPlayer).firstMove) return true;
 
-    const pieces = Array.from(this.pieces.values()).filter(p => (
-      p.ownerId === this.currentPlayer
-    ))
-
-    if (pieces.some(p =>
-      p.type === GAME_PIECE_TYPE.BEETLE
-      && p.state === PIECE_STATE.BOARD
-      && !this.pieces.has(hashPosToKey({ ...p.pos, z: p.pos.z + 1 }))
-      && !this.brokeBoard(p)
-    )) return true; // Besouro pode se mover e não tem ninguem em cima
+    const pieces = Array.from(this.pieces.values()).filter(
+      (p) => p.ownerId === this.currentPlayer
+    );
 
     if (
-      pieces.some(p =>
-        p.state === PIECE_STATE.BOARD
-        && !this.pieces.has(hashPosToKey({ ...p.pos, z: p.pos.z + 1 })) // Não tem ninguem em cima
-        && hexDirections.some(dir => {
-          const newPos: HexDirection = {
-            q: dir.q + p.pos.q,
-            r: dir.r + p.pos.r,
-            z: 1,
-          };
-          return (
-            !this.pieces.has(hashPosToKey(newPos)) // Nem tem peça naquela direção
-            && !this.getNeighbors(newPos)?.some(filtered => {
-              return filtered?.ownerId !== this.currentPlayer
-            }) // Os vizinhos não são inimigos
-          )
-        })
+      pieces.some(
+        (p) =>
+          p.type === GAME_PIECE_TYPE.BEETLE &&
+          p.state === PIECE_STATE.BOARD &&
+          !this.pieces.has(hashPosToKey({ ...p.pos, z: p.pos.z + 1 })) &&
+          !this.brokeBoard(p)
       )
-    ) return true;
+    )
+      return true; // Besouro pode se mover e não tem ninguem em cima
 
-    if (pieces.some(p =>
-      p.state === PIECE_STATE.BOARD
-      && !this.pieces.has(hashPosToKey({ ...p.pos, z: p.pos.z + 1 }))
-      && !this.brokeBoard(p)
-      && p.canMove(this)
-    )) return true; // se tem aalgum movimento válido das peças do board
+    if (
+      pieces.some(
+        (p) =>
+          p.state === PIECE_STATE.BOARD &&
+          !this.pieces.has(hashPosToKey({ ...p.pos, z: p.pos.z + 1 })) && // Não tem ninguem em cima
+          hexDirections.some((dir) => {
+            const newPos: HexDirection = {
+              q: dir.q + p.pos.q,
+              r: dir.r + p.pos.r,
+              z: 1,
+            };
+            return (
+              !this.pieces.has(hashPosToKey(newPos)) && // Nem tem peça naquela direção
+              !this.getNeighbors(newPos)?.some((filtered) => {
+                return filtered?.ownerId !== this.currentPlayer;
+              }) // Os vizinhos não são inimigos
+            );
+          })
+      )
+    )
+      return true;
+
+    if (
+      pieces.some(
+        (p) =>
+          p.state === PIECE_STATE.BOARD &&
+          !this.pieces.has(hashPosToKey({ ...p.pos, z: p.pos.z + 1 })) &&
+          !this.brokeBoard(p) &&
+          p.canMove(this)
+      )
+    )
+      return true; // se tem aalgum movimento válido das peças do board
 
     return false;
   }
@@ -1887,21 +2009,22 @@ export class Board {
   gameHasEnded(): boolean {
     if (this.playerTimer <= 0) {
       this.state = GAME_STATE.FINISHED;
-      this.winner = this.currentPlayer === this.p1.id ? this.p2.username : this.p1.username;
+      this.winner =
+        this.currentPlayer === this.p1.id ? this.p2.username : this.p1.username;
       return true;
     }
 
-    const queens: GamePiece[] = Array.from(this.pieces.values()).filter(p => {
-      return p.state === PIECE_STATE.BOARD && p.type === GAME_PIECE_TYPE.QUEEN
-    })
-    const qtdQueenBlocked: GamePiece[] = queens.filter(p => {
-      const neighbors = this.getNeighbors(p.pos)
-      return neighbors
-        && neighbors.length >= 6
-    })
+    const queens: GamePiece[] = Array.from(this.pieces.values()).filter((p) => {
+      return p.state === PIECE_STATE.BOARD && p.type === GAME_PIECE_TYPE.QUEEN;
+    });
+    const qtdQueenBlocked: GamePiece[] = queens.filter((p) => {
+      const neighbors = this.getNeighbors(p.pos);
+      return neighbors && neighbors.length >= 6;
+    });
     if (qtdQueenBlocked.length == 1) {
       this.state = GAME_STATE.FINISHED;
-      this.winner = qtdQueenBlocked[0].ownerId === this.p1.id ? this.p2.id : this.p1.id;
+      this.winner =
+        qtdQueenBlocked[0].ownerId === this.p1.id ? this.p2.id : this.p1.id;
       return true;
     } else if (qtdQueenBlocked.length == 2) {
       this.state = GAME_STATE.FINISHED;
@@ -1915,29 +2038,37 @@ export class Board {
       toast.info("THE GAME HAS FINISHED!!");
       if (this.winner === "") {
         toast.warning("The game ended with a DRAW :(");
-        toast.info("Click on GAME FINISHED to restart the game!")
+        toast.info("Click on GAME FINISHED to restart the game!");
       } else {
-        toast.success(`CONGRATULATIONS!!! ${this.getPlayer(this.winner).username}, WON!!!!`);
+        toast.success(
+          `CONGRATULATIONS!!! ${this.getPlayer(this.winner).username}, WON!!!!`
+        );
       }
     } else {
       if (this.currentPlayer === this.p1.id) {
         this.p1.moveCount = this.p1.moveCount ? this.p1.moveCount + 1 : 1;
-        this.p1.time = this.playerTimer < 5 ? this.playerTimer + 5 : this.playerTimer;
+        this.p1.time =
+          this.playerTimer < 5 ? this.playerTimer + 5 : this.playerTimer;
         this.currentPlayer = this.p2.id;
         this.playerTimer = this.p2.time;
       } else {
         this.p2.moveCount = this.p2.moveCount ? this.p2.moveCount + 1 : 1;
-        this.p2.time = this.playerTimer < 5 ? this.playerTimer + 5 : this.playerTimer;
+        this.p2.time =
+          this.playerTimer < 5 ? this.playerTimer + 5 : this.playerTimer;
         this.currentPlayer = this.p1.id;
         this.playerTimer = this.p1.time;
       }
       this.getPlayer(this.currentPlayer).canMove = this.calcPlayerCanMove();
       if (!this.p1.canMove && !this.p2.canMove) {
         toast.warning("The game ended with a DRAW :(");
-        toast.info("Click on GAME FINISHED to restart the game!")
+        toast.info("Click on GAME FINISHED to restart the game!");
         this.state = GAME_STATE.FINISHED;
       } else if (!this.getPlayer(this.currentPlayer).canMove) {
-        toast.info(`The player ${this.getPlayer(this.currentPlayer).username} lost his turn, doesn't have valid move!`);
+        toast.info(
+          `The player ${
+            this.getPlayer(this.currentPlayer).username
+          } lost his turn, doesn't have valid move!`
+        );
         this.saveGameState(); // must save state, player lost the move
         this.changePlayer();
       }
@@ -1953,13 +2084,18 @@ export class Board {
     }
 
     const pos: HexDirection = this.pixelToCube(x, y);
-    const hashPos = [5, 4, 3, 2, 1].map(z => GamePiece.hashPosToKey({ q: pos.q, r: pos.r, z })).filter(p => this.pieces.has(p)); // Para cada z, verifica se a peça está no Hive MAX 1 peça e 2 besouros
+    const hashPos = [5, 4, 3, 2, 1]
+      .map((z) => GamePiece.hashPosToKey({ q: pos.q, r: pos.r, z }))
+      .filter((p) => this.pieces.has(p)); // Para cada z, verifica se a peça está no Hive MAX 1 peça e 2 besouros
     if (hashPos.length > 0) {
       const piece = this.pieces.get(hashPos[0]);
       if (
-        piece
-        && piece.canDrag(this.currentPlayer)
-        && !this.pieces.has(GamePiece.hashPosToKey({ ...piece.pos, z: piece.pos.z + 1 }))) {
+        piece &&
+        piece.canDrag(this.currentPlayer) &&
+        !this.pieces.has(
+          GamePiece.hashPosToKey({ ...piece.pos, z: piece.pos.z + 1 })
+        )
+      ) {
         piece.draggable.isDragging = true;
         piece.draggable.offSet = { x, y };
       }
@@ -1971,25 +2107,25 @@ export class Board {
 
   canvaDrop(x: number, y: number) {
     if (this.state !== GAME_STATE.PLAYING) return;
-    this.pieces.forEach(p => {
+    this.pieces.forEach((p) => {
       if (p.draggable.isDragging) {
         p.draggable.isDragging = false;
         p.possibleMoves = null;
         p = this.dropPiece(p, this.pixelToCube(x, y));
       }
-    })
+    });
   }
 
   canvaMove(x: number, y: number) {
     if (this.state !== GAME_STATE.PLAYING) return;
     this.mousePos = { ...this.mousePos, x, y };
-    this.pieces.forEach(p => {
+    this.pieces.forEach((p) => {
       if (p.draggable.isDragging) {
         p.draggable.offSet.x = x;
         p.draggable.offSet.y = y;
         if (p.state === PIECE_STATE.BOARD) this.moveBoard2(10);
       }
-    })
+    });
     if (!this.isOnBoard(x, y)) {
       this.mousePos = { state: PIECE_STATE.PLAYER, x, y };
     } else {
@@ -2000,13 +2136,15 @@ export class Board {
   isOnBoard(_x: number, y: number) {
     if (!this.currentCanva) return false;
 
-    return (
-      y >= this.divisoryBoard
-      && y <= this.currentCanva.height
-    );
+    return y >= this.divisoryBoard && y <= this.currentCanva.height;
   }
 
-  isOnBoardBorder(xPos: number, yPos: number, border: number = 45, truePos: boolean = true) {
+  isOnBoardBorder(
+    xPos: number,
+    yPos: number,
+    border: number = 45,
+    truePos: boolean = true
+  ) {
     if (!this.currentCanva) return false;
 
     const x = truePos ? xPos : xPos + this.offSet.x;
@@ -2014,21 +2152,18 @@ export class Board {
 
     return !(
       x <= border ||
-      x >= this.currentCanva.width - border
-      || (
-        y >= (this.divisoryBoard - border)
-      )
-      || y >= this.currentCanva.height - border
+      x >= this.currentCanva.width - border ||
+      y >= this.divisoryBoard - border ||
+      y >= this.currentCanva.height - border
     );
   }
 
   drawHexHover(xPos: number, yPos: number, customColor?: string) {
-
     const stroke = customColor || "#ebe3e3";
     if (!this.currentCanva) {
       return;
     }
-    const ctx = this.currentCanva.getContext('2d');
+    const ctx = this.currentCanva.getContext("2d");
     if (!ctx) {
       return;
     }
@@ -2050,7 +2185,7 @@ export class Board {
     const hoverSize = this.HEX_SIZE * 1.1;
 
     for (let i = 0; i < 6; i++) {
-      const angle = Math.PI / 180 * (60 * i - 30);
+      const angle = (Math.PI / 180) * (60 * i - 30);
       const px = x + hoverSize * Math.cos(angle);
       const py = y + hoverSize * Math.sin(angle);
 
@@ -2064,7 +2199,7 @@ export class Board {
     ctx.closePath();
     ctx.stroke();
 
-    ctx.fillStyle = customColor || 'rgba(0, 0, 0, 0.4)';
+    ctx.fillStyle = customColor || "rgba(0, 0, 0, 0.4)";
     ctx.fill();
 
     ctx.restore();
@@ -2081,27 +2216,28 @@ export class Board {
       mousePos.y += this.offSet.y;
     }
     return (
-      this.mousePos.x > piecePos.x - this.HEX_SIZE / 2
-      && this.mousePos.x < piecePos.x + this.HEX_SIZE / 2
-      && this.mousePos.y > piecePos.y - this.HEX_SIZE / 2
-      && this.mousePos.y < piecePos.y + this.HEX_SIZE / 2
-    )
+      this.mousePos.x > piecePos.x - this.HEX_SIZE / 2 &&
+      this.mousePos.x < piecePos.x + this.HEX_SIZE / 2 &&
+      this.mousePos.y > piecePos.y - this.HEX_SIZE / 2 &&
+      this.mousePos.y < piecePos.y + this.HEX_SIZE / 2
+    );
   }
 
   renderPieces(pieces: GamePiece[]) {
     if (!this.currentCanva) return;
-    const ctx = this.currentCanva.getContext('2d');
+    const ctx = this.currentCanva.getContext("2d");
     if (!ctx) return;
     for (let piece of pieces) {
-      const { x, y } = piece.draggable.isDragging || piece.draggable.isMoving
-        ? {
-          x: piece.draggable.offSet.x,
-          y: piece.draggable.offSet.y
-        }
-        : this.cubeToPixel(piece.pos, piece.state);
+      const { x, y } =
+        piece.draggable.isDragging || piece.draggable.isMoving
+          ? {
+              x: piece.draggable.offSet.x,
+              y: piece.draggable.offSet.y,
+            }
+          : this.cubeToPixel(piece.pos, piece.state);
       if (
-        !piece.draggable.isDragging
-        && this.isHoveringPiece({ ...this.mousePos }, { x, y })
+        !piece.draggable.isDragging &&
+        this.isHoveringPiece({ ...this.mousePos }, { x, y })
       ) {
         this.drawHex(x, y, piece, true);
       } else {
@@ -2115,37 +2251,47 @@ export class Board {
   }
 
   renderBoardPieces() {
-    this.pieces.forEach(p => {
+    this.pieces.forEach((p) => {
       if (p.draggable.isDragging) {
-        p.getPossibleMoves(this).forEach(pos => {
+        p.getPossibleMoves(this).forEach((pos) => {
           const { x, y } = this.cubeToPixel(pos, PIECE_STATE.BOARD);
           this.drawHexHover(x, y, "rgba(99, 215, 107, 0.76)");
-        })
+        });
       }
-    })
-    this.renderPieces(Array.from(this.pieces.values()).filter(p => p.state === PIECE_STATE.BOARD))
+    });
+    this.renderPieces(
+      Array.from(this.pieces.values()).filter(
+        (p) => p.state === PIECE_STATE.BOARD
+      )
+    );
   }
 
   renderPlayerPieces() {
-    this.renderPieces(Array.from(this.pieces.values()).filter(p => p.state === PIECE_STATE.PLAYER))
+    this.renderPieces(
+      Array.from(this.pieces.values()).filter(
+        (p) => p.state === PIECE_STATE.PLAYER
+      )
+    );
   }
 
   cubeToPixel({ q, r }: HexDirection, pieceState?: PIECE_STATE) {
     if (!this.currentCanva) return { x: 0, y: 0 };
-    const canvaWidth = pieceState === undefined
-      ? this.mousePos.state === PIECE_STATE.BOARD
+    const canvaWidth =
+      pieceState === undefined
+        ? this.mousePos.state === PIECE_STATE.BOARD
+          ? this.currentCanva.width + this.offSet.x
+          : this.currentCanva.width
+        : pieceState === PIECE_STATE.BOARD
         ? this.currentCanva.width + this.offSet.x
-        : this.currentCanva.width
-      : pieceState === PIECE_STATE.BOARD
-        ? this.currentCanva.width + this.offSet.x
-        : this.currentCanva.width
-    const canvaHeight = pieceState === undefined
-      ? this.mousePos.state === PIECE_STATE.BOARD
+        : this.currentCanva.width;
+    const canvaHeight =
+      pieceState === undefined
+        ? this.mousePos.state === PIECE_STATE.BOARD
+          ? this.currentCanva.height + this.offSet.y
+          : this.currentCanva.height
+        : pieceState === PIECE_STATE.BOARD
         ? this.currentCanva.height + this.offSet.y
-        : this.currentCanva.height
-      : pieceState === PIECE_STATE.BOARD
-        ? this.currentCanva.height + this.offSet.y
-        : this.currentCanva.height
+        : this.currentCanva.height;
     const x = this.HEX_WIDTH * (q + r / 2) + canvaWidth / 2;
     const y = this.HEX_HEIGHT * (3 / 4) * r + canvaHeight / 2;
     return { x, y };
@@ -2153,24 +2299,26 @@ export class Board {
 
   pixelToCube(x: number, y: number, pieceState?: PIECE_STATE): HexDirection {
     if (!this.currentCanva) return { q: 0, r: 0, z: 0 };
-    const canvaWidth = pieceState === undefined
-      ? this.mousePos.state === PIECE_STATE.BOARD
+    const canvaWidth =
+      pieceState === undefined
+        ? this.mousePos.state === PIECE_STATE.BOARD
+          ? this.currentCanva.width + this.offSet.x
+          : this.currentCanva.width
+        : pieceState === PIECE_STATE.BOARD
         ? this.currentCanva.width + this.offSet.x
-        : this.currentCanva.width
-      : pieceState === PIECE_STATE.BOARD
-        ? this.currentCanva.width + this.offSet.x
-        : this.currentCanva.width
-    const canvaHeight = pieceState === undefined
-      ? this.mousePos.state === PIECE_STATE.BOARD
+        : this.currentCanva.width;
+    const canvaHeight =
+      pieceState === undefined
+        ? this.mousePos.state === PIECE_STATE.BOARD
+          ? this.currentCanva.height + this.offSet.y
+          : this.currentCanva.height
+        : pieceState === PIECE_STATE.BOARD
         ? this.currentCanva.height + this.offSet.y
-        : this.currentCanva.height
-      : pieceState === PIECE_STATE.BOARD
-        ? this.currentCanva.height + this.offSet.y
-        : this.currentCanva.height
+        : this.currentCanva.height;
     const xOffset = x - canvaWidth / 2;
     const yOffset = y - canvaHeight / 2;
-    const q = (xOffset * Math.sqrt(3) / 3 - yOffset / 3) / this.HEX_SIZE;
-    const r = yOffset * 2 / 3 / this.HEX_SIZE;
+    const q = ((xOffset * Math.sqrt(3)) / 3 - yOffset / 3) / this.HEX_SIZE;
+    const r = (yOffset * 2) / 3 / this.HEX_SIZE;
     return this.cubeRound({ q, r, z: 1 } as HexDirection);
   }
 
@@ -2201,19 +2349,20 @@ export class Board {
 
   drawHex(x: number, y: number, piece: GamePiece, makedBorder?: boolean) {
     const fillColor = piece.ownerId == this.p1.id ? "white" : "black";
-    const stroke = (this.state === GAME_STATE.FINISHED || this.state === GAME_STATE.PAUSED)
-      ? "rgb(255, 0, 0)"
-      : makedBorder
-        ? (piece.ownerId == this.currentPlayer
+    const stroke =
+      this.state === GAME_STATE.FINISHED || this.state === GAME_STATE.PAUSED
+        ? "rgb(255, 0, 0)"
+        : makedBorder
+        ? piece.ownerId == this.currentPlayer
           ? "rgb(10, 233, 97)"
-          : "rgb(255, 0, 0)")
+          : "rgb(255, 0, 0)"
         : "transparent";
     if (!this.currentCanva) return;
-    const ctx = this.currentCanva.getContext('2d');
+    const ctx = this.currentCanva.getContext("2d");
     if (!ctx) return;
     ctx.beginPath();
     for (let i = 0; i < 6; i++) {
-      const angle = Math.PI / 180 * (60 * i - 30);
+      const angle = (Math.PI / 180) * (60 * i - 30);
       const px = x + this.HEX_SIZE * Math.cos(angle);
       const py = y + this.HEX_SIZE * Math.sin(angle);
       if (i === 0) ctx.moveTo(px, py);
@@ -2241,7 +2390,7 @@ export class Board {
   getNeighbors({ q, r }: HexDirection) {
     if (!this.currentCanva) return;
     let neighbors: GamePiece[] = [];
-    hexDirections.forEach(dir => {
+    hexDirections.forEach((dir) => {
       const pos = { q: q + dir.q, r: r + dir.r, z: 1 };
       while (this.pieces.has(GamePiece.hashPosToKey(pos))) {
         pos.z++;
@@ -2249,26 +2398,26 @@ export class Board {
       if (pos.z > 1) {
         pos.z--;
         const n = this.pieces.get(GamePiece.hashPosToKey(pos));
-        if (n)
-          neighbors.push(n);
+        if (n) neighbors.push(n);
       }
-    })
+    });
     return neighbors;
   }
 
   placePiece(pieceContructor: GamePieceConstructor) {
-    if (this.pieces.has(GamePiece.hashPosToKey(pieceContructor.pos))) return false;
+    if (this.pieces.has(GamePiece.hashPosToKey(pieceContructor.pos)))
+      return false;
     const piece = new GamePiece(pieceContructor);
     this.pieces.set(GamePiece.hashPosToKey(piece.pos), piece);
   }
 
   placePieces(pieces: GamePieceConstructor[]) {
-    pieces.forEach(p => this.placePiece(p));
+    pieces.forEach((p) => this.placePiece(p));
   }
 
   renderBoard() {
     if (!this.currentCanva) return;
-    const ctx = this.currentCanva.getContext('2d');
+    const ctx = this.currentCanva.getContext("2d");
     if (!ctx) return;
 
     //draw line on middle of the width but with height of 5*30
@@ -2284,43 +2433,54 @@ export class Board {
 
   moveBoard2(velocity: number = 2) {
     if (!this.currentCanva) return;
-    const ctx = this.currentCanva.getContext('2d');
+    const ctx = this.currentCanva.getContext("2d");
     if (!ctx) return;
 
     // get the border of the piece (north, south, east, west)
     const border = 40;
-    if (this.mousePos.x < border) { // Encostou na esquerda
+    if (this.mousePos.x < border) {
+      // Encostou na esquerda
       this.offSet.x += velocity;
     }
-    if (this.mousePos.x > this.currentCanva.width - border) { // Encostou na direita
+    if (this.mousePos.x > this.currentCanva.width - border) {
+      // Encostou na direita
       this.offSet.x -= velocity;
     }
-    if (
-      this.mousePos.y > this.currentCanva.height - border
-    ) { // Encostou em baixo
+    if (this.mousePos.y > this.currentCanva.height - border) {
+      // Encostou em baixo
       this.offSet.y -= velocity;
     }
     if (
-      this.mousePos.y > this.divisoryBoard - border
-      && this.mousePos.y < this.divisoryBoard + border
-    ) { // Encostou em cima
+      this.mousePos.y > this.divisoryBoard - border &&
+      this.mousePos.y < this.divisoryBoard + border
+    ) {
+      // Encostou em cima
       this.offSet.y += velocity;
     }
   }
 
   render() {
     if (!this.currentCanva) return;
-    const ctx = this.currentCanva.getContext('2d');
+    const ctx = this.currentCanva.getContext("2d");
     if (!ctx) return;
     ctx.clearRect(0, 0, this.currentCanva.width, this.currentCanva.height);
     this.renderBoard();
     this.renderPlayerPieces();
     ctx.save();
     ctx.beginPath();
-    ctx.rect(0, this.divisoryBoard, this.currentCanva.width, this.currentCanva.height);
+    ctx.rect(
+      0,
+      this.divisoryBoard,
+      this.currentCanva.width,
+      this.currentCanva.height
+    );
     ctx.clip();
     this.renderBoardPieces();
-    this.drawHexHover(this.mousePos.x, this.mousePos.y, "rgba(235, 203, 61, 0.76)");
+    this.drawHexHover(
+      this.mousePos.x,
+      this.mousePos.y,
+      "rgba(235, 203, 61, 0.76)"
+    );
     ctx.restore();
   }
 }
