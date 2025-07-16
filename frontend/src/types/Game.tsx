@@ -1011,9 +1011,6 @@ export class Board {
     } else board.loadState(state as GameTree);
     console.dir(board.gameTree, { depth: null });
     board.uncalculating();
-    board.updateHooks();
-    console.log(`Nodes Visited: ${visited.size}`);
-    console.log(`ALL Generated States: ${board.gameStates.size}`);
     if (board.gameHasEnded()) {
       toast.info("THE GAME HAS FINISHED!!");
       if (board.winner === "") {
@@ -1027,8 +1024,10 @@ export class Board {
         );
       }
       board.state = GAME_STATE.FINISHED;
-      board.updateHooks();
     }
+    board.updateHooks();
+    console.log(`Nodes Visited: ${visited.size}`);
+    console.log(`ALL Generated States: ${board.gameStates.size}`);
     return board;
   }
 
@@ -1193,9 +1192,6 @@ export class Board {
     } else board.loadState(state as GameTree);
     console.dir(board.gameTree, { depth: null });
     board.uncalculating();
-    board.updateHooks();
-    console.log(`Nodes Visited: ${visited.size}`);
-    console.log(`ALL Generated States: ${board.gameStates.size}`);
     if (board.gameHasEnded()) {
       toast.info("THE GAME HAS FINISHED!!");
       if (board.winner === "") {
@@ -1209,8 +1205,10 @@ export class Board {
         );
       }
       board.state = GAME_STATE.FINISHED;
-      board.updateHooks();
     }
+    board.updateHooks();
+    console.log(`Nodes Visited: ${visited.size}`);
+    console.log(`ALL Generated States: ${board.gameStates.size}`);
     return board;
   }
 
